@@ -1,0 +1,21 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Server for sumoskyapp",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.ifi.uzh.ch/vmml/sumoskyapp"
+  },
+  "author": "Nora Beringer",
+  "license": "MIT",
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
+    "verbose": true
+  }
+}

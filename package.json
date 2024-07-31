@@ -1,0 +1,58 @@
+{
+  "name": "sumoskyapp",
+  "version": "1.0.0",
+  "description": "3D viewer tool supporting interactive analysis and visualization of sun, moon, sky and landscape constellations.",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.ifi.uzh.ch/vmml/sumoskyapp"
+  },
+  "author": "Nora Beringer",
+  "license": "MIT",
+  "workspaces": [
+    "packages/server",
+    "packages/client"
+  ],
+  "devDependencies": {
+    "@eslint/compat": "^1.1.1",
+    "@eslint/js": "^9.8.0",
+    "@types/jest": "^29.5.12",
+    "@typescript-eslint/eslint-plugin": "^7.17.0",
+    "@typescript-eslint/parser": "^7.17.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-jsx-a11y": "^6.9.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "globals": "^15.8.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.3",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^7.17.0"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.2"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "verbose": true,
+    "moduleDirectories": [
+      "node_modules",
+      "packages"
+    ],
+    "roots": [
+      "<rootDir>/packages"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testMatch": [
+      "**/?(*.)+(spec|test).ts?(x)"
+    ]
+  }
+}
