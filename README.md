@@ -6,19 +6,19 @@ To start the development server follow these steps:
 - Ensure node.js and npm is installed.
 - Navigate to the location of the client directory.
 - Ensure all necessary packages found in packages.json are installed.
-  - The necessary webpack library, client interface and the webpack-dev-server can be installed as follows: npm install '--save-dev webpack webpack-cli' and 'npm install --save-dev webpack-dev-server'.
-- If the compiled JavaScript files are not alredy located at ./dist execute 'npx tsc' in order to compile them from ./src.
-- Execute 'npm run build' to build the project.
-- Execute 'npm start' in order to start the devServer at localhost:8080.
+  - The necessary webpack library, client interface and the webpack-dev-server can be installed as follows: `npm install --save-dev webpack webpack-cli` and `npm install --save-dev webpack-dev-server`.
+- If the compiled JavaScript files are not alredy located at ./dist execute `npx tsc` in order to compile them from ./src.
+- Execute `npm run build` to build the project.
+- Execute `npm start` in order to start the devServer at localhost:8080.
 
 ## Using the Production Server to run example data
 To run the example data follow these steps:
 - Ensure node.js and npm is installed.
 - Navigate to the location of the server directory.
-- Execute 'npm install' in order to install the required node_modules.
-- If the compiled JavaScript files are not already located at ./dist execute 'npx tsc' in order to compile them from the provided TypeScript files located at ./src.
-- Execute 'npm run build' to build the project.
-- Execute 'npm start' in order to start the server at localhost:3000.
+- Execute `npm install` in order to install the required node_modules.
+- If the compiled JavaScript files are not already located at ./dist execute `npx tsc` in order to compile them from the provided TypeScript files located at ./src.
+- Execute `npm run build` to build the project.
+- Execute `npm start` in order to start the server at localhost:3000.
 
 ---
 
