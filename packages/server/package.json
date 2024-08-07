@@ -2,10 +2,12 @@
   "name": "server",
   "version": "1.0.0",
   "description": "Server for sumoskyapp",
-  "main": "index.js",
+  "main": "./dist/index.js",
   "scripts": {
     "test": "jest",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build": "tsc",
+    "start": "node ./dist/index.js"
   },
   "repository": {
     "type": "git",
@@ -17,5 +19,21 @@
     "preset": "ts-jest",
     "testEnvironment": "jsdom",
     "verbose": true
+  },
+  "devDependencies": {
+    "@eslint/compat": "^1.1.1",
+    "@eslint/js": "^9.8.0",
+    "@types/nconf": "^0.10.7",
+    "@typescript-eslint/eslint-plugin": "^7.17.0",
+    "@typescript-eslint/parser": "^7.17.0",
+    "eslint": "^9.8.0",
+    "eslint-plugin-jsx-a11y": "^6.9.0",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^7.17.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "nconf": "^0.12.1",
+    "node-static": "^0.7.11"
   }
 }

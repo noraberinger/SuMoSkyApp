@@ -1,0 +1,28 @@
+{
+    "server": {
+      "type": "expert",
+      "hostname": "localhost",
+      "port": 3000,
+      "heightAssets": "./testData/height",
+      "textureAssets": "./testData/color",
+      "geomErrorFolder": "./testData"
+    },
+    "client": {
+        "tileSideLength": 257,
+        "boundaries": [-180, -90, 180, 90],
+        "estMaxHeight": 10000,
+        "heightScaling": 0.000025,
+        "xStart": 0,
+        "yStart": 0,
+        "maxLod": 3,
+        "kPatchBase": 129,
+        "currentLod": 3,
+        "errorThreshold": 0.01,
+        "useCullingMetric": true,
+        "useDistanceMetric": true,
+        "useMinMaxForErrors": false,
+        "dynamicBinTreeUpdate": true,
+        "maxGpuCache": 200,
+        "maxRamCache": 400
+    }
+  }
