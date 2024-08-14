@@ -16,6 +16,7 @@ To run the example data follow these steps:
 - Ensure node.js and npm is installed.
 - Navigate to the location of the server directory.
 - Execute `npm install` in order to install the required node_modules.
+- For the packages `nconf` and `node-static` execute `npm i --save-dev @types/nconf` and `npm i --save-dev @types/node-static`. 
 - If the compiled JavaScript files are not already located at ./dist execute `npx tsc` in order to compile them from the provided TypeScript files located at ./src.
 - Execute `npm run build` to build the project.
 - Execute `npm start` in order to start the server at localhost:3000.
