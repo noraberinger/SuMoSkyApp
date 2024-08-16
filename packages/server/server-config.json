@@ -1,6 +1,5 @@
 {
   "server": {
-    "client": "client",
     "hostname": "localhost",
     "port": 3000,
     "heightAssets": "./testData/height",

@@ -1,8 +1,9 @@
 import React from 'react';
+//import {Terrender, StandardInputHandler} from 'terrender-core';
 
 const App: React.FC = () => {
   const greeting = "Hello World";
-  const numberInput = 3;
+  const numberInput = 10;
 
   return (
     <div>
@@ -11,5 +12,7 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+//Canvas Component which renders Terrender fully as is
 
 export default App;

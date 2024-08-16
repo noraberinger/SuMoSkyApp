@@ -1,0 +1,3 @@
+[submodule "webgisterrain"]
+	path = webgisterrain
+	url = git@gitlab.ifi.uzh.ch:vmml/webgisterrain.git

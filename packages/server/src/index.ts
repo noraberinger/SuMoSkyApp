@@ -14,7 +14,6 @@ interface ServerConfig {
     heightAssets?: string;
     textureAssets?: string;
     geomErrorFolder?: string;
-    client: string;
 }
 
 interface ClientConfig {
@@ -41,7 +40,6 @@ const serverConfig: ServerConfig = {
     heightAssets: resolvePath(nconf.get('server:heightAssets') as string),
     textureAssets: resolvePath(nconf.get('server:textureAssets') as string),
     geomErrorFolder: resolvePath(nconf.get('server:geomErrorFolder') as string),
-    client: (nconf.get('server:client') as string) || 'client'
 };
 
 const hostname = serverConfig.hostname;
@@ -49,20 +47,13 @@ const port = serverConfig.port;
 const heightAssetFolder = serverConfig.heightAssets;
 const textureAssetFolder = serverConfig.textureAssets;
 const geomErrorFolder = serverConfig.geomErrorFolder;
-const client = serverConfig.client;
-
-// Validate server type
-if (!(client === 'client' || client === 'expert' || client === 'standard' || client === 'minimal' || client === 'noDrawingBench')) {
-    console.error('Unknown server type: ' + client);
-    process.exit(1);
-}
 
 // Process client configuration
 const clientConfig = processClientConfig(nconf) as ClientConfig;
 
 // Initialize express app and static server
 const app = express();
-const staticServer = new StaticServer(`../${client}/public`);
+const staticServer = new StaticServer(`../client/dist`);
 
 // Handle height asset requests
 const handleHeightAsset = async (req: Request, res: Response) => {
