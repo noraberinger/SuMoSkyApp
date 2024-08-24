@@ -37,9 +37,8 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const terrenderRef = useRef<Terrender | null>(null);
   const inputHandlerRef = useRef<StandardInputHandler | null>(null);
-
-  const [isDrawing, setIsDrawing] = useState(false);
-
+  const [currentIsTopDownRef, setIsTopDownRef] = useState(false);
+    
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas){
@@ -84,38 +83,22 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
     }
     
   }, [config]);
+
+  const toggleTopDownMode = () => {
+    if (inputHandlerRef.current) {
+      const currentIsTopDown = inputHandlerRef.current.isTopDownMode();
+      inputHandlerRef.current.setTopDownMode(!currentIsTopDown);
+      setIsTopDownRef(!currentIsTopDown);
+    }
+  };
   
   return (
     <>
     <canvas style={{width:"100%", height:"100%"}} ref={canvasRef} />
     <div style={{position: "absolute", top: "2em", right: "2em"}}>
-      <button type="button" onClick={() => setIsDrawing(prev => !prev)}>
-        {isDrawing ? 'Disable Drawing' : 'Enable Drawing'}
+      <button type="button" onClick={toggleTopDownMode}>
+        {currentIsTopDownRef? 'Disable Top Down Mode' : 'Enable Top Down Mode'}
       </button> 
-      {isDrawing && (
-        <div id="drawingContainer" className="container">
-          <div id="lineContainer">
-            <input type="color" id="colorPicker" defaultValue="#000000" />
-            <label htmlFor="colorPicker">Color</label>
-          </div>
-          <div id="lineContainer">
-            <input type="checkbox" id="deleteLine" />
-            <label htmlFor="deleteLine">Delete Line</label>
-          </div>
-          <div id="lineContainer">
-            <input type="number" defaultValue="0.5" step="0.1" id="lineWidth" />
-            <label htmlFor="lineWidth">Line Width</label>
-          </div>
-          <div id="lineContainer">
-            <button type="button" id="downloadLines">Download JSON</button>
-          </div>
-          <div id="lineContainer">
-            <input type="file" id="uploadLinesFile" accept=".json" />
-            <button id="uploadLines">Upload JSON</button>
-          </div>
-          <div id="fileError"></div>
-        </div>
-      )}
     </div>
     </>
   );
