@@ -2,9 +2,9 @@
   "server": {
     "hostname": "localhost",
     "port": 3000,
-    "heightAssets": "./testData/height",
-    "textureAssets": "./testData/color",
-    "geomErrorFolder": "./testData"
+    "heightAssets": "../testData/height",
+    "textureAssets": "../testData/color",
+    "geomErrorFolder": "../testData"
   },
   "client": {
       "tileSideLength": 257,
