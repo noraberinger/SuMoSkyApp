@@ -15,11 +15,15 @@ module.exports = {
       {
         test: /\.(frag|vert)$/,
         use: 'webpack-glsl-loader'
-      }
+      },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
+      },
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
+    extensions: ['.tsx', '.ts', '.js', '.css'],
   },
   output: {
     filename: 'bundle.js',

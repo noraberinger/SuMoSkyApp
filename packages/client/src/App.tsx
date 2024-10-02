@@ -1,6 +1,7 @@
 import React from 'react';
-import { useRef, useEffect, useState} from 'react';
+import { useEffect, useState} from 'react';
 import TerrenderCanvas from './components/TerrenderCanvas';
+import LeafletMap from './components/LeafletMap';
 
 interface ClientConfig {
   tileSideLength?: number;
@@ -62,6 +63,7 @@ const App: React.FC = () => {
     <div>
       {clientConfig? <TerrenderCanvas config={clientConfig} />: <div>Loading config</div>}
       {error? <div>Error: {error}</div>:null}
+      <LeafletMap></LeafletMap>
     </div>
   );
 };

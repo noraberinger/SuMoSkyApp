@@ -94,8 +94,11 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
   
   return (
     <>
-    <canvas style={{width:"100%", height:"100%"}} ref={canvasRef} />
-    <div style={{position: "absolute", top: "2em", right: "2em"}}>
+    <canvas 
+    id="terrender" 
+    style={{width:"100%", height:"100%", zIndex: "2"}} 
+    ref={canvasRef} />
+    <div style={{position: "absolute", top: "20px", left: "60px", zIndex: "2"}}>
       <button type="button" onClick={toggleTopDownMode}>
         {currentIsTopDownRef? 'Disable Top Down Mode' : 'Enable Top Down Mode'}
       </button> 
