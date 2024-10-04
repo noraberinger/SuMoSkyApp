@@ -1,6 +1,8 @@
 import React from 'react';
 import { useRef, useEffect, useState} from 'react';
 import {Terrender, StandardInputHandler} from 'terrender-core';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 
 interface ClientConfig {
   tileSideLength?: number;
@@ -96,12 +98,13 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
     <>
     <canvas 
     id="terrender" 
-    style={{width:"100%", height:"100%", zIndex: "2"}} 
     ref={canvasRef} />
-    <div style={{position: "absolute", top: "20px", left: "60px", zIndex: "2"}}>
-      <button type="button" onClick={toggleTopDownMode}>
+    <div style={{position: "absolute", top: "20px", right: "60px", zIndex: "2"}}>
+      <Button variant="contained" color="info" onClick={toggleTopDownMode}>
         {currentIsTopDownRef? 'Disable Top Down Mode' : 'Enable Top Down Mode'}
-      </button> 
+      </Button>
+
+
     </div>
     </>
   );

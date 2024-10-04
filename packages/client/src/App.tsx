@@ -60,10 +60,10 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div>
+    <div className='app-container'>
       {clientConfig? <TerrenderCanvas config={clientConfig} />: <div>Loading config</div>}
       {error? <div>Error: {error}</div>:null}
-      <LeafletMap></LeafletMap>
+      <LeafletMap />
     </div>
   );
 };

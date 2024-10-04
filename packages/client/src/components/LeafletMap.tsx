@@ -11,13 +11,7 @@ const LeafletMap: React.FC = () => {
     id="map" 
     center={positionZurich} 
     zoom={18} 
-    style={
-      {width:"100%", 
-      height:"100%",
-      position: 'absolute',
-      top: '0',
-      bottom: '0',
-      zIndex: '1'}}
+    style={{position: 'absolute'}}
     scrollWheelZoom={true}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
