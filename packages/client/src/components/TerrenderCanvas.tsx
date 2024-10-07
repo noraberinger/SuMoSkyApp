@@ -1,7 +1,6 @@
 import React from 'react';
 import { useRef, useEffect, useState} from 'react';
 import {Terrender, StandardInputHandler} from 'terrender-core';
-import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 
 interface ClientConfig {
@@ -32,6 +31,7 @@ interface ClientConfig {
 }
 
 /**
+ * @returns TerrenderCanvas
  * Canvas Component which renders Terrender fully as is according to config. 
  * Where config is the output of processClientConfig.ts.
 */
@@ -44,29 +44,29 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas){
-      console.error("Canvas reference is not set");
+      console.error('Canvas reference is not set');
       return;
     }
 
     const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
     if (!gl){
-      console.error("WebGL not supported");
+      console.error('WebGL not supported');
       return;
     }
 
     if (!config){
-      console.error("Config is not loaded");
+      console.error('Config is not loaded');
       return;
     }
 
     try{
-      //Initialize Terrender and input handler
+      /** Initialize Terrender and input handler */
       terrenderRef.current =new Terrender(gl, config, config.initialCamera as object);
       inputHandlerRef.current =new StandardInputHandler(terrenderRef.current);
-      //Render terrain
+      /** Render terrain */
       terrenderRef.current.start();
     } catch (error){
-      console.error("Failed to initialize Terrender or Input Handler:", error);
+      console.error('Failed to initialize Terrender or Input Handler:', error);
     }
 
     /** Clean up:
@@ -76,7 +76,7 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
     return () => {
       if (terrenderRef.current){
         terrenderRef.current.running = false;
-        const gl = terrenderRef.current.getGlInfo().getGl();
+        const gl = terrenderRef.current.getGl();
         const loseContext = gl.getExtension('WEBGL_lose_context');
         loseContext?.loseContext();
         terrenderRef.current = null;
@@ -86,6 +86,11 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
     
   }, [config]);
 
+  /**
+   * Functionality Button which allows user to change to top down view of Terrender and back.
+   * Makes use of @mui Button component:
+   * * https://mui.com/material-ui/react-button/
+   */
   const toggleTopDownMode = () => {
     if (inputHandlerRef.current) {
       const currentIsTopDown = inputHandlerRef.current.isTopDownMode();
@@ -97,14 +102,15 @@ const TerrenderCanvas : React.FC<{config: ClientConfig}> = ({ config }) => {
   return (
     <>
     <canvas 
-    id="terrender" 
-    ref={canvasRef} />
-    <div style={{position: "absolute", top: "20px", right: "60px", zIndex: "2"}}>
-      <Button variant="contained" color="info" onClick={toggleTopDownMode}>
+    ref={canvasRef}
+    style={{
+      width: '100%',
+      height: '100%'}}
+    />
+    <div id='top-down-mode-button' style={{position: 'absolute', bottom: '1em', right: '1em'}}>
+      <Button variant='contained' color='info' onClick={toggleTopDownMode} size='small'>
         {currentIsTopDownRef? 'Disable Top Down Mode' : 'Enable Top Down Mode'}
       </Button>
-
-
     </div>
     </>
   );
