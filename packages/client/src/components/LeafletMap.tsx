@@ -1,44 +1,60 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useState, useRef } from 'react';
 import { LayersControl, MapContainer, Marker, TileLayer, ZoomControl, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import L, { LatLngExpression } from 'leaflet';
 import LocationPin from './LocationPin';
+import { Button, Snackbar, Typography } from '@mui/material';
 
 export type Marker = {
   id: string;
   name:string;
-  position:  L.LatLngExpression;
+  position:  L.LatLngExpression
 }
 
-interface LeafletMapProps {
+export interface LeafletMapProps {
   mapRef: React.MutableRefObject<L.Map | null>;
   center: L.LatLngExpression;
   markers: Marker[];
+  setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
+  setCenter: React.Dispatch<React.SetStateAction<L.LatLngExpression>>;
 }
 
-const MapSetter = ({mapRef, center, markers}: LeafletMapProps) => {
+/** Setting the mapRef.current to the map object, making the map accessible from other components.  */
+const MapSetter = ({mapRef, center, markers, setMarkers, setCenter}: LeafletMapProps) => {
   const map = useMap();
+  const markerLayerRef = useRef<L.Marker[]>([]);
   useEffect(() => {
     mapRef.current = map;
   }, [map]);
 
-  // sync center with map
+  /** Runs whenever center changes. Updates map view to the center -> e.g. moving to the location passed over the SearchField. */ 
   useEffect(() => {
+    console.log('setting center running', center);
     map.setView(center, 13);
   }, [center]);
 
-  // sync markers with map
+  /** Runs whenever markers changes -> adding new marker of the specified position to the markers array.
+   *  Keeps track of markers using markerLayerRef in order to enable deleting by clicking onto marker.
+   *  For that on each useEffect all existing markers are removed (full layer removal), then the still existing markers are added to the map.
+   */
   useEffect(()=> {
-    markers.forEach((marker) => {
-      L.marker(marker.position).addTo(map);
+    markerLayerRef.current.forEach(marker => {
+      marker.remove();
     });
 
-    // todo cleanup: remove old markers again
+    markerLayerRef.current = [];
+
+    const newMarkers = markers.map((marker) => {
+      const newMarker = L.marker(marker.position).addTo(map);
+      return newMarker;
+    });
+
+    markerLayerRef.current = newMarkers;
   }, [markers])
 
   return null;
 }
 
-export const positionZurich : L.LatLngExpression = [47.37, 8.53];
+export const positionZurich : L.LatLngExpression = [47.3744489, 8.5410422];
 
 
 /**
@@ -47,9 +63,49 @@ export const positionZurich : L.LatLngExpression = [47.37, 8.53];
  * * https://leafletjs.com/reference.html
  * * https://www.openstreetmap.org
 */
-const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers }) => {
+const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setMarkers, setCenter }, ) => {
+  /** Logic for deleting a preexisting marker. */
+  const [inDeletionMode, setDeletionMode] = useState(false);
+  const [openSnackbarDel, setOpenSnackbarDel] = useState(false);
+  const [openSnackbarGoLocation, setOpenSnackbarGoLocation] = useState(false);
 
+  const deleteMarker = (markerId: string) => {
+    setMarkers((prevMarkers) => prevMarkers.filter(marker => marker.id != markerId));
+    setDeletionMode(false);
+  };
 
+  /** Helper function when Marker is clicked where marker.position === center */
+  const zoom = (position: L.LatLngExpression) => {
+    if (mapRef.current) {
+      mapRef.current.setView(position, 13);
+    }
+  };
+
+  const handleMarkerClick = (markerId: string, markerPos: L.LatLngExpression) => {
+    if (inDeletionMode) {
+      deleteMarker(markerId);
+    } else {
+      console.log('markPosClick', markerPos);
+      //debugger;
+      setOpenSnackbarGoLocation(true);
+      if (markerPos != center) {
+        setCenter(markerPos);
+      } else { 
+        zoom(markerPos);
+      }
+      
+    }
+  };
+
+  /** Informing user on how to delete a marker. */
+  const handleSnackbarClose = () => {
+    if (openSnackbarDel)  {
+      setOpenSnackbarDel(false);
+    } else if (openSnackbarGoLocation) {
+      setOpenSnackbarGoLocation(false);
+    }
+  };
+  
   return (
     <MapContainer 
       style={{width: '100%', height: '100%'}}
@@ -58,19 +114,58 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers }) => {
       zoomControl={false}
       scrollWheelZoom={true}
       >
-      <MapSetter mapRef={mapRef} center={center} markers={markers} />
-      <TileLayer 
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.osm.ch/switzerland/{z}/{x}/{y}.png"
-      />
+      {/* Map Hooks */}
+      <MapSetter mapRef={mapRef} center={center} markers={markers} setMarkers={setMarkers} setCenter={setCenter} />
       <LayersControl position='bottomright' >
-        {markers.map(marker => (<LayersControl.Overlay key={marker.id} name={marker.name}>
-          <Marker position={marker.position}>
+        {/* Base Layers */}
+        <LayersControl.BaseLayer checked name='World Imagery'>
+          <TileLayer 
+          attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+          url='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+          />
+        </LayersControl.BaseLayer>
+        <LayersControl.BaseLayer checked name='OpenStreetMap'>
+          <TileLayer 
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://tile.osm.ch/switzerland/{z}/{x}/{y}.png"
+          />
+        </LayersControl.BaseLayer>
+        {/* Markers => Input from SearchField */}
+        {markers.map(marker => (<LayersControl.Overlay key={marker.id} name={marker.name} checked>
+          <Marker 
+            position={marker.position}
+            interactive={true}
+            eventHandlers={
+              {click: (e) => {
+              handleMarkerClick(marker.id, marker.position);},}
+            }
+            >
           </Marker>
         </LayersControl.Overlay> ))}
       </LayersControl>
+      {/* Draggable Marker */}
       <LocationPin />
       <ZoomControl position='bottomleft'/>
+      {/* Deletion of Marker */}
+      <Button variant='contained' color='info' onClick={() => {setDeletionMode(!inDeletionMode), setOpenSnackbarDel(true)}} size='small' style={{position: 'absolute', top: '110px', left: '10px', zIndex: '1000'}}>
+            {inDeletionMode ? 'Cancel Delete' : 'Delete Marker'}
+      </Button> 
+      <Snackbar 
+        open={openSnackbarDel}
+        message={
+          <Typography dangerouslySetInnerHTML={{ __html: 'To delete a marker click on the marker icon of the marker you want to remove.' }} />
+        }
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      />
+      <Snackbar 
+        open={openSnackbarGoLocation}
+        message={
+          <Typography dangerouslySetInnerHTML={{ __html: 'Moving to location of clicked marker...<br /> If no movement occurs, please uncheck and recheck the checkbox of the Marker.' }} />
+        }
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      />
     </MapContainer>
   );
 };

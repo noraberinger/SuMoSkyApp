@@ -1,7 +1,12 @@
 import React from 'react';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
+
+interface CalendarProps {
+    selectedDate: Date;
+    onChange: (date: Date) => void;
+}
 
 /**
  * @returns Calendar
@@ -11,16 +16,26 @@ import dayjs from 'dayjs';
  * * https://mui.com/x/react-date-pickers/date-picker/
  * * https://mui.com/x/api/date-pickers/localization-provider/
  */
-const Calendar: React.FC = () => {
+const Calendar: React.FC<CalendarProps> = ({ selectedDate, onChange }) => {
     const startDate = dayjs('2024-01-01');
 
+    const handleDateChange = (date: Dayjs | null) => {
+        if (date) {
+            onChange(date.toDate());
+        }
+    };
+
     return (
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-            minDate={startDate}
-            sx={(theme)=> ({ width: "100%", "& .MuiInputBase-root": { backgroundColor: theme.palette.primary.light }})}
-            />
-        </LocalizationProvider>
+        <div style={{paddingRight: '0.5em'}}>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                minDate={startDate}
+                value={dayjs(selectedDate)}
+                onChange={handleDateChange}
+                sx={(theme)=> ({ width: "100%", "& .MuiInputBase-root": { backgroundColor: theme.palette.primary.light }})}
+                />
+            </LocalizationProvider>
+        </div>
     )
 };
 

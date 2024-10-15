@@ -27,10 +27,14 @@ const LocationPin: React.FC = () => {
         }),
         [],
     )
+    /** onClick onto the popup window this function is called making the pin draggable. */
     const toggleDraggable = useCallback(() => {
         setDraggable((d) => !d)
     }, [])
 
+    /** Get the rounded pin Position.
+     * The rounded result is used in form of a string to inform the user of latLng position of the current position.
+     */
     const roundedPinPosition = Array.isArray(pinPosition) ? (pinPosition as number[]).map(coord => Math.round(coord * 100) / 100) : pinPosition;
 
     return (

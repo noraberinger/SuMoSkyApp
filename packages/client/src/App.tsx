@@ -7,6 +7,8 @@ import LeafletMap, {positionZurich, Marker} from './components/LeafletMap';
 import DayTimeSlider from './components/DayTimeSlider';
 import Calendar from './components/Calendar';
 import SearchField from './components/SearchField';
+import { Terrender } from 'terrender-core';
+import SunPositionCalc from './components/SunPositionCalc';
 
 interface ClientConfig {
   tileSideLength?: number;
@@ -38,19 +40,33 @@ interface ClientConfig {
 
 
 /**
- * Fetch ClientConfig from Server -> result of processClientConfig
+ * Main access point for the appliation.
 */ 
 const App: React.FC = () => {
+  /** For client config and possible error messages when loading. */
   const [clientConfig, setClientConfig] = useState<ClientConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Map reference => LeafletMap */
   const mapRef = useRef<L.Map | null>(null);
-
+  /** For Marker functionality when accessed over SearchField.
+   *  By default set to the position of Zurich. */
   const [markers, setMarkers] = useState<Marker[]>([{id: self.crypto.randomUUID(), name: 'Zurich', position: positionZurich}]);
   const [center, setCenter] = useState(positionZurich);
+  const MAX_MARKER = 10;
+  /** Calculations of Sun Position
+   * By default Date on Calendar is set to current date.
+   * By default Time on TimeSlider is set to current hour => e.g. 19:40 shows 19:00 on TimeSlider.
+   */
+  //const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  const now = new Date()
+  const [selectedDate, setSelectedDate] = useState<Date>(now);
+  const [sliderTime, setSliderTime] = useState<number>(now.getHours());
+  console.log('selected Date', selectedDate, 'sliderTime', sliderTime);
 
-  console.log('markers', markers, 'center', center);
+  console.log('markers in App', markers, 'center', center);
   if (error) console.log(error);
 
+  /** Fetch ClientConfig from Server -> result of processClientConfig */
   useEffect(() => {
     const fetchConfig = async () => {
       try {
@@ -75,28 +91,31 @@ const App: React.FC = () => {
 
   return (
     <>
-    <Grid spacing={1} container sx={{ maxHeight: '20vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1000, backgroundColor: 'rgba(60,60,60,0.6)'}}>
     {/* UI */}
-    <Grid sx={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}} size={{xs:12, md:3}}>
-      <SearchField map={mapRef.current} setMarkers={setMarkers} setCenter={setCenter} />
-    </Grid>
-    <Grid sx={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}} size={{xs:12, md:3}}>
-      <Calendar/>
-    </Grid>
-    <Grid size={{xs:12, md:6}}>
-      <DayTimeSlider/>
-    </Grid>
-  </Grid>
-    {/* height set to 120%. 
-      * There seems to be some Overflow from the LeafletMap. 
-      * When the height < 120% a gap in the tiling can be seen when scrolling down to observe the bottom of the map container. */}
-    <Grid spacing={1} container height={'120%'}>
-      {/* Maps */}
-      <Grid  size={{xs:12, md:6}}>
-        <LeafletMap mapRef={mapRef} center={center} markers={markers} />
+    <Grid spacing={1} container sx={{ maxHeight: '20vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1000, backgroundColor: 'rgba(60,60,60,0.6)'}}>
+      <Grid sx={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}} size={{xs:12, md:3}}>
+        <SearchField map={mapRef.current} setCenter={setCenter} setMarkers={setMarkers} maxMarkers={MAX_MARKER} />
+      </Grid>
+      <Grid sx={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}} size={{xs:12, md:3}}>
+        <Calendar selectedDate={selectedDate} onChange={setSelectedDate} />
       </Grid>
       <Grid size={{xs:12, md:6}}>
-          {clientConfig? <TerrenderCanvas config={clientConfig} />: <div>Loading config</div>}
+        <DayTimeSlider value={sliderTime} onChange={setSliderTime}/>
+      </Grid>
+    </Grid>
+    { /* Map container
+      * Container height set to 120%. 
+      * There seems to be some Overflow from the LeafletMap. However it renders correctly when TerrenderCanvas is removed. 
+      * When the height < 120% a gap in the tiling can be seen when scrolling down to observe the bottom of the map container. */}
+    <Grid spacing={1} container height={'100%'}> 
+      <Grid  size={{xs:12, md:6}}>
+        <LeafletMap mapRef={mapRef} center={center} markers={markers} setMarkers={setMarkers} setCenter={setCenter} />
+        <div id="sunPositionCalc" style={{position: 'absolute', zIndex: 1000}}>
+          <SunPositionCalc mapRef={mapRef} center={center} date={selectedDate} time={sliderTime} />
+        </div>
+      </Grid>  
+      <Grid size={{xs:12, md:6}} sx={{maxHeight: "100%", overflow: "hidden"}}>
+          {clientConfig? <TerrenderCanvas config={clientConfig} center={center} />: <div>Loading config</div>}
           {error? <div>Error: {error}</div>:null}
       </Grid>
     </Grid>
