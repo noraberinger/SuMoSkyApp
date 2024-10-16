@@ -28,7 +28,6 @@ const MapSetter = ({mapRef, center, markers, setMarkers, setCenter}: LeafletMapP
 
   /** Runs whenever center changes. Updates map view to the center -> e.g. moving to the location passed over the SearchField. */ 
   useEffect(() => {
-    console.log('setting center running', center);
     map.setView(center, 13);
   }, [center]);
 
@@ -85,8 +84,6 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setMar
     if (inDeletionMode) {
       deleteMarker(markerId);
     } else {
-      console.log('markPosClick', markerPos);
-      //debugger;
       setOpenSnackbarGoLocation(true);
       if (markerPos != center) {
         setCenter(markerPos);

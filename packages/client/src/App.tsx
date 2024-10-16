@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEffect, useState, useRef} from 'react';
 import './App.css';
-import { Grid2 as Grid } from '@mui/material';
+import { Grid2 as Grid, Button } from '@mui/material';
 import TerrenderCanvas from './components/TerrenderCanvas';
 import LeafletMap, {positionZurich, Marker} from './components/LeafletMap';
 import DayTimeSlider from './components/DayTimeSlider';
@@ -103,10 +103,7 @@ const App: React.FC = () => {
         <DayTimeSlider value={sliderTime} onChange={setSliderTime}/>
       </Grid>
     </Grid>
-    { /* Map container
-      * Container height set to 120%. 
-      * There seems to be some Overflow from the LeafletMap. However it renders correctly when TerrenderCanvas is removed. 
-      * When the height < 120% a gap in the tiling can be seen when scrolling down to observe the bottom of the map container. */}
+    { /* Map container */}
     <Grid spacing={1} container height={'100%'}> 
       <Grid  size={{xs:12, md:6}}>
         <LeafletMap mapRef={mapRef} center={center} markers={markers} setMarkers={setMarkers} setCenter={setCenter} />
@@ -114,9 +111,9 @@ const App: React.FC = () => {
           <SunPositionCalc mapRef={mapRef} center={center} date={selectedDate} time={sliderTime} />
         </div>
       </Grid>  
-      <Grid size={{xs:12, md:6}} sx={{maxHeight: "100%", overflow: "hidden"}}>
-          {clientConfig? <TerrenderCanvas config={clientConfig} center={center} />: <div>Loading config</div>}
-          {error? <div>Error: {error}</div>:null}
+      <Grid size={{xs:12, md:6}} sx={{ maxHeight: "100%", overflow: "hidden" }}>
+            {clientConfig? <TerrenderCanvas config={clientConfig} center={center} />: <div>Loading config</div>}
+            {error? <div>Error: {error}</div>:null}
       </Grid>
     </Grid>
     </>
