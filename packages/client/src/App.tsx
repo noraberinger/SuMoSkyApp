@@ -37,8 +37,6 @@ interface ClientConfig {
   dollyCam?: object[];
 }
 
-
-
 /**
  * Main access point for the appliation.
 */ 
@@ -62,12 +60,9 @@ const App: React.FC = () => {
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   const initialSliderTime = currentHour * 6 + Math.round(currentMinute/10);
-  console.log('initialsliderTime', initialSliderTime, currentHour, currentMinute);
   const [selectedDate, setSelectedDate] = useState<Date>(now);
   const [sliderTime, setSliderTime] = useState<number>(initialSliderTime);
-  console.log('selected Date', selectedDate, 'sliderTime', sliderTime);
 
-  console.log('markers in App', markers, 'center', center);
   if (error) console.log(error);
 
   /** Fetch ClientConfig from Server -> result of processClientConfig */
