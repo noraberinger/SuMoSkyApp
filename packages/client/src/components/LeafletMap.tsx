@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useRef } from 'react';
+import React, {useEffect, useState, useRef, Dispatch, SetStateAction, MutableRefObject } from 'react';
 import { LayersControl, MapContainer, Marker, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
 import LocationPin from './LocationPin';
@@ -10,25 +10,30 @@ export type Marker = {
   position:  L.LatLngExpression
 }
 
-export interface LeafletMapProps {
+export interface LeafletMapSetterProps {
   mapRef: React.MutableRefObject<L.Map | null>;
-  center: L.LatLngExpression;
+  center?: L.LatLngExpression;
+  setCenter: React.Dispatch<React.SetStateAction<LatLngExpression | undefined>>;
   markers: Marker[];
-  setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
-  setCenter: React.Dispatch<React.SetStateAction<L.LatLngExpression>>;
 }
 
+export interface LeafletMapProps extends LeafletMapSetterProps  {
+  setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
+}
+
+
 /** Setting the mapRef.current to the map object, making the map accessible from other components.  */
-const MapSetter = ({mapRef, center, markers, setMarkers, setCenter}: LeafletMapProps) => {
+const MapSetter = ({mapRef, center, setCenter, markers}: LeafletMapSetterProps) => {
   const map = useMap();
   const markerLayerRef = useRef<L.Marker[]>([]);
   useEffect(() => {
     mapRef.current = map;
+    setCenter(map.getCenter());
   }, [map]);
 
   /** Runs whenever center changes. Updates map view to the center -> e.g. moving to the location passed over the SearchField. */ 
   useEffect(() => {
-    map.setView(center, 13);
+    if (center) map.setView(center, 13);
   }, [center]);
 
   /** Runs whenever markers changes -> adding new marker of the specified position to the markers array.
@@ -55,6 +60,12 @@ const MapSetter = ({mapRef, center, markers, setMarkers, setCenter}: LeafletMapP
 
 export const positionZurich : L.LatLngExpression = [47.3744489, 8.5410422];
 
+/** Helper function when Marker is clicked where marker.position === center */
+const zoom = (position: L.LatLngExpression, mapRef: React.MutableRefObject<L.Map | null>) => {
+  if (mapRef.current) {
+    mapRef.current.setView(position, 13);
+  }
+};
 
 /**
  * @returns LeafletMap
@@ -62,7 +73,7 @@ export const positionZurich : L.LatLngExpression = [47.3744489, 8.5410422];
  * * https://leafletjs.com/reference.html
  * * https://www.openstreetmap.org
 */
-const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setMarkers, setCenter }, ) => {
+const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCenter, setMarkers}, ) => {
   /** Logic for deleting a preexisting marker. */
   const [inDeletionMode, setDeletionMode] = useState(false);
   const [openSnackbarDel, setOpenSnackbarDel] = useState(false);
@@ -73,25 +84,16 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setMar
     setDeletionMode(false);
   };
 
-  /** Helper function when Marker is clicked where marker.position === center */
-  const zoom = (position: L.LatLngExpression) => {
-    if (mapRef.current) {
-      mapRef.current.setView(position, 13);
-    }
-  };
-
   const handleMarkerClick = (markerId: string, markerPos: L.LatLngExpression) => {
     if (inDeletionMode) {
       deleteMarker(markerId);
     } else {
       setOpenSnackbarGoLocation(true);
-      if (markerPos != center) {
-        setCenter(markerPos);
-      } else { 
-        zoom(markerPos);
-      }
-      
+      setCenter(markerPos);
+      if (markerPos === center) {
+        zoom(markerPos, mapRef);
     }
+  }
   };
 
   /** Informing user on how to delete a marker. */
@@ -106,13 +108,13 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setMar
   return (
     <MapContainer 
       style={{width: '100%', height: '100%'}}
-      center={center} 
-      zoom={18} 
+      center={center||markers[0].position} 
+      zoom={13} 
       zoomControl={false}
       scrollWheelZoom={true}
       >
       {/* Map Hooks */}
-      <MapSetter mapRef={mapRef} center={center} markers={markers} setMarkers={setMarkers} setCenter={setCenter} />
+      <MapSetter mapRef={mapRef} center={center} setCenter={setCenter} markers={markers} />
       <LayersControl position='bottomright' >
         {/* Base Layers */}
         <LayersControl.BaseLayer checked name='World Imagery'>

@@ -1,14 +1,14 @@
 import React from 'react';
 import { useEffect, useState, useRef} from 'react';
 import './App.css';
-import { Grid2 as Grid, Button } from '@mui/material';
+import { Grid2 as Grid, Button, SliderThumb } from '@mui/material';
 import TerrenderCanvas from './components/TerrenderCanvas';
 import LeafletMap, {positionZurich, Marker} from './components/LeafletMap';
 import DayTimeSlider from './components/DayTimeSlider';
 import Calendar from './components/Calendar';
 import SearchField from './components/SearchField';
-import { Terrender } from 'terrender-core';
-import SunPositionCalc from './components/SunPositionCalc';
+import SunMoonPositionCalc from './components/SunMoonPositionCalc';
+import { LatLngExpression } from 'leaflet';
 
 interface ClientConfig {
   tileSideLength?: number;
@@ -51,7 +51,7 @@ const App: React.FC = () => {
   /** For Marker functionality when accessed over SearchField.
    *  By default set to the position of Zurich. */
   const [markers, setMarkers] = useState<Marker[]>([{id: self.crypto.randomUUID(), name: 'Zurich', position: positionZurich}]);
-  const [center, setCenter] = useState(positionZurich);
+  const [center, setCenter] = useState<L.LatLngExpression>();
   const MAX_MARKER = 10;
   /** Calculations of Sun Position
    * By default Date on Calendar is set to current date.
@@ -59,8 +59,12 @@ const App: React.FC = () => {
    */
   //const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const now = new Date()
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const initialSliderTime = currentHour * 6 + Math.round(currentMinute/10);
+  console.log('initialsliderTime', initialSliderTime, currentHour, currentMinute);
   const [selectedDate, setSelectedDate] = useState<Date>(now);
-  const [sliderTime, setSliderTime] = useState<number>(now.getHours());
+  const [sliderTime, setSliderTime] = useState<number>(initialSliderTime);
   console.log('selected Date', selectedDate, 'sliderTime', sliderTime);
 
   console.log('markers in App', markers, 'center', center);
@@ -107,12 +111,12 @@ const App: React.FC = () => {
     <Grid spacing={1} container height={'100%'}> 
       <Grid  size={{xs:12, md:6}}>
         <LeafletMap mapRef={mapRef} center={center} markers={markers} setMarkers={setMarkers} setCenter={setCenter} />
-        <div id="sunPositionCalc" style={{position: 'absolute', zIndex: 1000}}>
-          <SunPositionCalc mapRef={mapRef} center={center} date={selectedDate} time={sliderTime} />
+        <div id="sunMoonPositionCalc" style={{position: 'absolute', zIndex: 1000}}>
+          <SunMoonPositionCalc mapRef={mapRef} center={center} date={selectedDate} time={sliderTime} />
         </div>
       </Grid>  
       <Grid size={{xs:12, md:6}} sx={{ maxHeight: "100%", overflow: "hidden" }}>
-            {clientConfig? <TerrenderCanvas config={clientConfig} center={center} />: <div>Loading config</div>}
+            {clientConfig? <TerrenderCanvas config={clientConfig} center={center} time={sliderTime} date={selectedDate} />: <div>Loading config</div>}
             {error? <div>Error: {error}</div>:null}
       </Grid>
     </Grid>

@@ -23,7 +23,7 @@ module.exports = {
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js', '.css'],
+    extensions: ['.tsx', '.ts', '.js', '.css', '.frag', '.vert'],
   },
   output: {
     filename: 'bundle.js',
@@ -38,7 +38,7 @@ module.exports = {
       patterns: [
         { from: path.resolve(__dirname, '../../node_modules/terrender-core/webworkerPng/workerBundlePng.js'), to: path.resolve(__dirname, 'dist') },
         { from: path.resolve(__dirname, '../../node_modules/terrender-core/webworkerTiffColor/workerBundleTiffColor.js'), to: path.resolve(__dirname, 'dist') },
-        { from: path.resolve(__dirname, '../../node_modules/terrender-core/webworkerTiffHeight/workerBundleTiffHeight.js'), to: path.resolve(__dirname, 'dist') }
+        { from: path.resolve(__dirname, '../../node_modules/terrender-core/webworkerTiffHeight/workerBundleTiffHeight.js'), to: path.resolve(__dirname, 'dist') },
       ],
     }),
     new CleanWebpackPlugin(),
@@ -47,7 +47,7 @@ module.exports = {
   devServer: {
     proxy: [
       {
-        context: ['/config', '/geom', '/asset'],
+        context: ['/config', '/geom', '/asset', '/textures'],
         target: 'http://localhost:3000',
       },
     ],

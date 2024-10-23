@@ -6,6 +6,34 @@ interface TimeSliderProps {
     onChange: (value: number) => void;
 }
 
+/** Generating the marking of the slider which consists of a full day, respectively allows to range between 0:00 and 23:00. */ 
+const generateTimeMarks = () => {
+    const marks = [];
+    for (let i = 0; i <= 144; i++) {
+        const hour = Math.floor(i / 6);
+        marks.push({
+            value: i,
+            //label: hour % 2 ? '' : `${hour}:00`
+            label: hour % 2 === 0 && i % 6 === 0 ? `${hour}:00` : ''
+        });
+    }
+    return marks;
+};
+
+const timeMarks = generateTimeMarks();
+
+/** Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
+function valueText(value: number) {
+    //const hour = value % 24;
+    const hour = Math.floor(value / 6);
+    const minute = (value % 6) * 10;
+    if (minute != 0) {
+        return `${hour}:${minute}`;
+    } else{
+        return `${hour}:${minute}0`;
+    }  
+}
+
 /**
  * @returns DayTimeSlider
  * Allowing user to range over the hours of a full day (24 hours) using a slider tool.
@@ -13,30 +41,6 @@ interface TimeSliderProps {
  * * https://mui.com/material-ui/react-slider/
  */
 const DayTimeSlider: React.FC<TimeSliderProps> = ({ value, onChange }) => {
-
-    /**
-     * Generating the marking of the slider which consists of a full day, respectively allows to range between 0:00 and 23:00.
-    */ 
-    const generateTimeMarks = () => {
-        const marks = [];
-        for (let hour = 0; hour <= 24; hour++) {
-            marks.push({
-                value: hour,
-                label: hour % 2 ? '' : `${hour}:00`
-            });
-        }
-        return marks;
-    };
-
-    const timeMarks = generateTimeMarks();
-
-    /**
-     * Converts the values into a string such that screen readers can make use of the numeric value of the slider.
-    */
-    function valueText(value: number) {
-        const hour = value % 24;
-        return `${hour}:00`;
-    }
 
     return (
         <div style={{ marginTop: '2em', padding: '0 1.75em',}}>
@@ -47,7 +51,7 @@ const DayTimeSlider: React.FC<TimeSliderProps> = ({ value, onChange }) => {
             onChange={(e, newValue) => onChange(newValue as number)}
             marks={timeMarks}
             min={0}
-            max={24}
+            max={144}
             step={1}
             getAriaValueText={valueText}
             valueLabelDisplay={'on'}

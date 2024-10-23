@@ -1,7 +1,8 @@
 //Translated this file from .js into .ts, the .js file was authored by Julian Croci.
 
 import express, { Request, Response } from 'express';
-import nconf from 'nconf';
+import cors from 'cors';
+import nconf, { get, use } from 'nconf';
 import fs from 'fs';
 import path from 'path';
 import processClientConfig from './processClientConfig';
@@ -14,6 +15,7 @@ interface ServerConfig {
     heightAssets?: string;
     textureAssets?: string;
     geomErrorFolder?: string;
+    textureFolder?: string;
 }
 
 interface ClientConfig {
@@ -40,6 +42,7 @@ const serverConfig: ServerConfig = {
     heightAssets: resolvePath(nconf.get('server:heightAssets') as string),
     textureAssets: resolvePath(nconf.get('server:textureAssets') as string),
     geomErrorFolder: resolvePath(nconf.get('server:geomErrorFolder') as string),
+    textureFolder: resolvePath(nconf.get('server:textureFolder') as string),
 };
 
 const hostname = serverConfig.hostname;
@@ -47,6 +50,7 @@ const port = serverConfig.port;
 const heightAssetFolder = serverConfig.heightAssets;
 const textureAssetFolder = serverConfig.textureAssets;
 const geomErrorFolder = serverConfig.geomErrorFolder;
+const textureFolder = serverConfig.textureFolder;
 
 // Process client configuration
 const clientConfig = processClientConfig(nconf) as ClientConfig;
@@ -54,6 +58,15 @@ const clientConfig = processClientConfig(nconf) as ClientConfig;
 // Initialize express app and static server
 const app = express();
 const staticServer = new StaticServer(`../client/dist`);
+
+// Handle textureFolder
+if (textureFolder) {
+  app.use('/textures', express.static(textureFolder));
+} else {
+  app.get('/textures', (req: Request, res: Response) => {
+    res.status(404).send('No texture assets provided');
+  });
+}
 
 // Handle height asset requests
 const handleHeightAsset = async (req: Request, res: Response) => {

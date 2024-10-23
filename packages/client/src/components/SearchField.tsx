@@ -4,7 +4,7 @@ import { TextField, InputAdornment, Snackbar, Typography } from '@mui/material';
 import 'leaflet-control-geocoder';
 import L from 'leaflet';
 import { Marker } from './LeafletMap';
-import { NextLunarEclipse } from 'astronomy-engine';
+import { convertLatLngToCoords } from './Utils/Calc';
 
 interface GeocodeResultType {
     center: L.LatLng;
@@ -12,7 +12,7 @@ interface GeocodeResultType {
 
 interface SearchFieldProps {
     map: L.Map | null;
-    setCenter: React.Dispatch<React.SetStateAction<L.LatLngExpression>>;
+    setCenter: React.Dispatch<React.SetStateAction<L.LatLngExpression|undefined>>;
     setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
     maxMarkers: number;
 }
@@ -52,22 +52,10 @@ const SearchField: React.FC<SearchFieldProps> = ({ map, setCenter, setMarkers, m
                 /** Setting the map to the specified location. */
                 setCenter(latLng);
                 /** TypeCheck to safeguard LatLngExpression */
-                const typeCheckLatLng = (marker: Marker)  => {
+                const typeCheckLatLng = (marker: Marker) : { lat: number; lng: number } => {
                     const markerPos = marker.position;
-            
-                    /** Type check for each type of LatLngExpression */
-                    if (Array.isArray(markerPos)) {
-                        /** If position is an array/tuple => [latitude, longitude] */
-                            return { lat: markerPos[0], lng: markerPos[1] };
-                    } else if (markerPos instanceof L.LatLng) {
-                        /** If position is an instance of L.LatLng */
-                        return { lat: markerPos.lat, lng: markerPos.lng};
-                    } else if ('lat' in markerPos && 'lng' in markerPos) {
-                        /** If position is an object literal with lat and lng properties */
-                        return { lat: markerPos.lat, lng: markerPos.lng };
-                    } else {
-                        throw new TypeError('Invalid LatLngExpression');
-                    }
+                    const { lat, lng } = convertLatLngToCoords(markerPos);
+                    return { lat, lng };
                 };
                 /** Generating the new Marker
                  *  Additionally checking if the Marker is already contained in Marker[] => if true the marker is not added to the array.

@@ -21,12 +21,14 @@
     "verbose": true
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
     "nconf": "^0.12.1",
     "node-static": "^0.7.11",
-    "express": "^4.19.2",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/nconf": "^0.10.7",
     "@types/node-static": "^0.7.11"
   }
