@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useRef, Dispatch, SetStateAction, MutableRefObject } from 'react';
+import React, {useEffect, useState, useRef } from 'react';
 import { LayersControl, MapContainer, Marker, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
 import LocationPin from './LocationPin';
@@ -135,7 +135,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
             position={marker.position}
             interactive={true}
             eventHandlers={
-              {click: (e) => {
+              {click: () => {
               handleMarkerClick(marker.id, marker.position);},}
             }
             >

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 import { TextField, InputAdornment, Snackbar, Typography } from '@mui/material';
 import 'leaflet-control-geocoder';
@@ -38,6 +38,7 @@ const SearchField: React.FC<SearchFieldProps> = ({ map, setCenter, setMarkers, m
     const handleSearchInput = (input: string)=> {
         if (!input || !map ) return;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const geocoder = (L.Control as any).Geocoder.nominatim();
 
         if (!geocoder) {

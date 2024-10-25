@@ -1,7 +1,8 @@
-//Translated this file from .js into .ts, the .js file was authored by Julian Croci.
+/** Translated this file from .js into .ts, the .js file was authored by Julian Croci. 
+ * Further extended it for own use.
+*/
 
 import express, { Request, Response } from 'express';
-import cors from 'cors';
 import nconf, { get, use } from 'nconf';
 import fs from 'fs';
 import path from 'path';

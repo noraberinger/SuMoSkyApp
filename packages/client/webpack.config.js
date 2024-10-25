@@ -13,7 +13,7 @@ module.exports = {
         exclude: /node_modules/,
       },
       {
-        test: /\.(frag|vert)$/,
+        test: /\.(glsl|frag|vert)$/,
         use: 'webpack-glsl-loader'
       },
       {

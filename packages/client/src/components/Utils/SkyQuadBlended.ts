@@ -1,27 +1,33 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 'use strict';
 import * as twgl from 'twgl.js';
-import SunCalc from 'suncalc';
-import { convertDateTime } from './Calc';
+import { convertLatLngToCoords, convertDateTime, calculateSunriseSunset } from './Calc';
+import L from 'leaflet';
+import { act } from 'react';
+
+//TODO find out why ts doesn't recognize import of shader
 const shadedFs = require('../shaders/skyQuadBlended.frag');
 const shadedVs = require('../shaders/skyQuadBlended.vert');
 
 class SkyQuadBlended {
     private gl: WebGL2RenderingContext | WebGLRenderingContext;
-    private textures: { dayTexture: WebGLTexture | null; nightTexture: WebGLTexture | null; sunsetSunriseTexture: WebGLTexture | null };
+    private textures: { dayTexture: WebGLTexture | null; nightTexture: WebGLTexture | null; sunsetTexture: WebGLTexture | null; sunriseTexture: WebGLTexture | null };
     private shaderProgramInfo: twgl.ProgramInfo;
     private shaderProgram: WebGLProgram | null;
     private bufferInfo: twgl.BufferInfo;
-    private blendFactor: number;
+    private lightningPhase: number;
+    private dayPhase: number;
 
-    constructor(gl: WebGL2RenderingContext | WebGLRenderingContext) {
+    constructor(gl: WebGL2RenderingContext | WebGLRenderingContext, date: Date, time: number) {
         this.gl = gl;
-        this.textures = { dayTexture: null, nightTexture: null, sunsetSunriseTexture: null };
+        this.textures = { dayTexture: null, nightTexture: null, sunsetTexture: null, sunriseTexture: null };
         this.shaderProgramInfo = twgl.createProgramInfo(this.gl, [shadedVs, shadedFs]);
         this.shaderProgram = this.shaderProgramInfo.program;
         this.bufferInfo = this.createQuadBuffer();
         this.setupTextures();
         this.clamp(0, 0, 0);
-        this.blendFactor = 0.0;
+        this.lightningPhase = this.initialPhase(date, time);
+        this.dayPhase = this.initialPhase(date, time);
     }
 
     /** Create a simple Quad */
@@ -37,8 +43,9 @@ class SkyQuadBlended {
     private setupTextures(): void {
         const dayTextureUrl = '/textures/cloudy2.jpg';
         const nightTextureUrl = '/textures/pleiades_cube.jpeg';
-        const sunsetSunriseTextureUrl = '/textures/layered.jpg';
-
+        const sunsetTextureUrl = '/textures/sunrise.jpg';
+        const sunriseTextureUrl = '/textures/layered.jpg';
+        
         this.textures.dayTexture = twgl.createTexture(this.gl, {
             src: dayTextureUrl,
         });
@@ -47,8 +54,12 @@ class SkyQuadBlended {
             src: nightTextureUrl,
         });
 
-        this.textures.sunsetSunriseTexture = twgl.createTexture(this.gl, {
-            src: sunsetSunriseTextureUrl,
+        this.textures.sunsetTexture = twgl.createTexture(this.gl, {
+            src: sunsetTextureUrl,
+        });
+
+        this.textures.sunriseTexture = twgl.createTexture(this.gl, {
+            src: sunriseTextureUrl,
         });
     }
 
@@ -57,18 +68,47 @@ class SkyQuadBlended {
         return Math.max(min, Math.min(max, value));
     }
     
-    public syncDateTime(date: Date, time: number) : void {
+    public syncDateTime(date: Date, time: number, center: L.LatLngExpression) : void {
         const actualTime = convertDateTime(date, time);
+        const { lat, lng } = convertLatLngToCoords(center);
+        const sunTimes = calculateSunriseSunset(lat, lng, date);
 
-        const isNight = actualTime.getHours() > 18 ||  actualTime.getHours() < 6;
-        let blendFactor= 0.0;
+        const sunsetHour = sunTimes.sunset.getHours();
+        const sunriseHour = sunTimes.sunrise.getHours();
+        const currentHour = actualTime.getHours();
 
-        if (isNight) {
-            blendFactor = 0.5;
+        const totalHoursDay = sunsetHour - sunriseHour;
+        const hoursSinceSunrise = currentHour - sunriseHour;
+
+        if (currentHour == sunriseHour) {
+            this.lightningPhase = 0.5;
+            this.dayPhase = 0.7;
+        } else if (currentHour < sunriseHour || currentHour > sunsetHour) {
+            this.lightningPhase = 0.0;
+            this.dayPhase = 0.0;
+        } else if (currentHour === sunsetHour) {
+            this.lightningPhase = 0.75;
+            this.dayPhase = 0.0;
         } else {
-            blendFactor = (time - 6) / 12;
+            this.lightningPhase = 1.0;
+            if (currentHour == 12) {
+                this.dayPhase = 1.0;
+            } else if (currentHour < 12) {
+                this.dayPhase = 0.5 + (hoursSinceSunrise / totalHoursDay) * 0.5;
+            } else {
+                this.dayPhase = 1.0 - (hoursSinceSunrise / totalHoursDay) * 0.2;
+            }
         }
-        this.blendFactor = this.clamp(blendFactor, 0.0, 1.0);
+
+        this.lightningPhase = this.clamp(this.lightningPhase, 0.0, 1.0);
+        this.dayPhase = this.clamp(this.dayPhase, 0.0, 1.0);
+    }
+
+    initialPhase(date: Date, time: number) : number {
+        const actualTime = convertDateTime(date, time);
+        let phase = actualTime.getHours();
+        phase = this.clamp(phase, 0.0, 1.0);
+        return phase;
     }
 
     /** Render using a blendFactor to blend from dayTexture to nightTexture according to the sliderValue. */
@@ -90,14 +130,18 @@ class SkyQuadBlended {
             this.gl.uniform1i(this.gl.getUniformLocation(this.shaderProgram, 'uTextureNight'), 1);
 
             this.gl.activeTexture(this.gl.TEXTURE2);
-            this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.sunsetSunriseTexture);
-            this.gl.uniform1i(this.gl.getUniformLocation(this.shaderProgram, 'uTextureSunsetSunrise'), 2);
-        
-            this.gl.uniform1f(this.gl.getUniformLocation(this.shaderProgram, 'uBlendFactor'), this.blendFactor);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.sunsetTexture);
+            this.gl.uniform1i(this.gl.getUniformLocation(this.shaderProgram, 'uTextureSunset'), 2);
 
-            twgl.setUniforms(this.shaderProgramInfo, {
-                uMVP: mvp,
-            });
+            this.gl.activeTexture(this.gl.TEXTURE3);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.sunriseTexture);
+            this.gl.uniform1i(this.gl.getUniformLocation(this.shaderProgram, 'uTextureSunrise'), 3);
+        
+            this.gl.uniform1f(this.gl.getUniformLocation(this.shaderProgram, 'uLightningPhase'), this.lightningPhase);
+
+            this.gl.uniform1f(this.gl.getUniformLocation(this.shaderProgram, 'uDayPhase'), this.dayPhase);
+
+            twgl.setUniforms(this.shaderProgramInfo, { uMVP: mvp });
 
             twgl.setBuffersAndAttributes(this.gl, this.shaderProgramInfo, this.bufferInfo);
             twgl.drawBufferInfo(this.gl, this.bufferInfo, this.gl.TRIANGLE_STRIP);

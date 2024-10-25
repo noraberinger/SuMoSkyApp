@@ -1,4 +1,5 @@
-import { LatLng, LatLngExpression } from 'leaflet';
+import { LatLngExpression } from 'leaflet';
+import SunCalc from 'suncalc';
 
 /** Helper function to convert value of DayTimeSlider to Date */
 export const convertDateTime = (date: Date, time: number) : Date => {
@@ -25,3 +26,9 @@ export  const convertLatLngToCoords = (latLng: LatLngExpression): { lat: number;
     } else { throw new TypeError('Invalid LatLngExpression'); }
     return { lat, lng };
 };
+
+/** Helper function to extract sunrise/sunset times */
+export const calculateSunriseSunset = (lat: number, lng: number, date: Date) : { sunrise: Date, sunset: Date} => {
+  const times = SunCalc.getTimes(date, lat, lng);
+  return { sunrise: times.sunrise, sunset: times.sunset };
+}
