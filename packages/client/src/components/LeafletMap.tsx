@@ -19,6 +19,7 @@ export interface LeafletMapSetterProps {
 
 export interface LeafletMapProps extends LeafletMapSetterProps  {
   setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
+  isDTLVisible: boolean;
 }
 
 
@@ -73,7 +74,7 @@ const zoom = (position: L.LatLngExpression, mapRef: React.MutableRefObject<L.Map
  * * https://leafletjs.com/reference.html
  * * https://www.openstreetmap.org
 */
-const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCenter, setMarkers}, ) => {
+const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCenter, setMarkers, isDTLVisible}, ) => {
   /** Logic for deleting a preexisting marker. */
   const [inDeletionMode, setDeletionMode] = useState(false);
   const [openSnackbarDel, setOpenSnackbarDel] = useState(false);
@@ -148,14 +149,12 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
           </Marker>
         </LayersControl.Overlay> ))}
       </LayersControl>
-      {/* Draggable Marker */}
-      <LocationPin />
       <ZoomControl position='bottomleft'/>
       {/* Deletion of Marker */}
-      <Button variant='contained' color='info' onClick={() => {setDeletionMode(!inDeletionMode), setOpenSnackbarDel(true)}} size='small' style={{position: 'absolute', top: '110px', left: '1em', zIndex: '1000'}}>
+      <Button variant='contained' color='info' onClick={() => {setDeletionMode(!inDeletionMode), setOpenSnackbarDel(true)}} size='small' style={{position: 'absolute', top: isDTLVisible ? '6.875em' : '0.3em', left: '1em', zIndex: '1000'}}>
             {inDeletionMode ? 'Cancel Delete' : 'Delete Marker'}
       </Button> 
-      <Button variant='contained' color='info' onClick={() => {setSaveDTL(!saveDTL), setOpenSnackbarDTL(true)}} size='small' style={{position: 'absolute', top: '150px', left: '1em', zIndex: '1000'}}>
+      <Button variant='contained' color='info' onClick={() => {setSaveDTL(!saveDTL), setOpenSnackbarDTL(true)}} size='small' style={{position: 'absolute', top: isDTLVisible ? '9.375em' : '2.9em', left: '1em', zIndex: '1000'}}>
             {saveDTL ? 'Save DTL' : 'Save DTL'}
       </Button> 
       <Snackbar 

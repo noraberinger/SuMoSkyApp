@@ -27,8 +27,8 @@ export  const convertLatLngToCoords = (latLng: LatLngExpression): { lat: number;
     return { lat, lng };
 };
 
-/** Helper function to extract sunrise/sunset times */
-export const calculateSunriseSunset = (lat: number, lng: number, date: Date) : { sunrise: Date, sunset: Date} => {
+/** Helper function to extract sun times */
+export const calculateSunTimes = (lat: number, lng: number, date: Date) : { sunrise: Date, sunset: Date, goldenHourMorning: Date, goldenHourEvening: Date, blueHourMorning: Date, blueHourEvening: Date} => {
   const times = SunCalc.getTimes(date, lat, lng);
-  return { sunrise: times.sunrise, sunset: times.sunset };
+  return { sunrise: times.sunrise, sunset: times.sunset, goldenHourMorning: times.goldenHourEnd, goldenHourEvening: times.goldenHour, blueHourMorning: times.nauticalDawn, blueHourEvening: times.dusk };
 }

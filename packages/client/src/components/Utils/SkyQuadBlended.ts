@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 'use strict';
 import * as twgl from 'twgl.js';
-import { convertLatLngToCoords, convertDateTime, calculateSunriseSunset } from './Calc';
-import L from 'leaflet';
+import { convertLatLngToCoords, convertDateTime, calculateSunTimes } from './Calc';
+import L, { LatLngExpression } from 'leaflet';
 import { act } from 'react';
 
 //TODO find out why ts doesn't recognize import of shader
@@ -18,16 +18,17 @@ class SkyQuadBlended {
     private lightningPhase: number;
     private dayPhase: number;
 
-    constructor(gl: WebGL2RenderingContext | WebGLRenderingContext, date: Date, time: number) {
+    constructor(gl: WebGL2RenderingContext | WebGLRenderingContext, date: Date, time: number, center:  L.LatLngExpression | undefined) {
         this.gl = gl;
         this.textures = { dayTexture: null, nightTexture: null, sunsetTexture: null, sunriseTexture: null };
+        this.setupTextures();
         this.shaderProgramInfo = twgl.createProgramInfo(this.gl, [shadedVs, shadedFs]);
         this.shaderProgram = this.shaderProgramInfo.program;
         this.bufferInfo = this.createQuadBuffer();
-        this.setupTextures();
         this.clamp(0, 0, 0);
-        this.lightningPhase = this.initialPhase(date, time);
-        this.dayPhase = this.initialPhase(date, time);
+        this.lightningPhase = 0;
+        this.dayPhase = 0;
+        this.syncDateTime(date, time, center);
     }
 
     /** Create a simple Quad */
@@ -68,47 +69,42 @@ class SkyQuadBlended {
         return Math.max(min, Math.min(max, value));
     }
     
-    public syncDateTime(date: Date, time: number, center: L.LatLngExpression) : void {
-        const actualTime = convertDateTime(date, time);
-        const { lat, lng } = convertLatLngToCoords(center);
-        const sunTimes = calculateSunriseSunset(lat, lng, date);
+    public syncDateTime(date: Date, time: number, center: L.LatLngExpression | undefined) : void {
+        if (center) {
+            const actualTime = convertDateTime(date, time);
+            const { lat, lng } = convertLatLngToCoords(center);
+            const sunTimes = calculateSunTimes(lat, lng, date);
 
-        const sunsetHour = sunTimes.sunset.getHours();
-        const sunriseHour = sunTimes.sunrise.getHours();
-        const currentHour = actualTime.getHours();
+            const sunsetHour = sunTimes.sunset.getHours();
+            const sunriseHour = sunTimes.sunrise.getHours();
+            const currentHour = actualTime.getHours();
 
-        const totalHoursDay = sunsetHour - sunriseHour;
-        const hoursSinceSunrise = currentHour - sunriseHour;
+            const totalHoursDay = sunsetHour - sunriseHour;
+            const hoursSinceSunrise = currentHour - sunriseHour;
 
-        if (currentHour == sunriseHour) {
-            this.lightningPhase = 0.5;
-            this.dayPhase = 0.7;
-        } else if (currentHour < sunriseHour || currentHour > sunsetHour) {
-            this.lightningPhase = 0.0;
-            this.dayPhase = 0.0;
-        } else if (currentHour === sunsetHour) {
-            this.lightningPhase = 0.75;
-            this.dayPhase = 0.0;
-        } else {
-            this.lightningPhase = 1.0;
-            if (currentHour == 12) {
-                this.dayPhase = 1.0;
-            } else if (currentHour < 12) {
-                this.dayPhase = 0.5 + (hoursSinceSunrise / totalHoursDay) * 0.5;
+            if (currentHour == sunriseHour) {
+                this.lightningPhase = 0.5;
+                this.dayPhase = 0.7;
+            } else if (currentHour < sunriseHour || currentHour > sunsetHour) {
+                this.lightningPhase = 0.0;
+                this.dayPhase = 0.0;
+            } else if (currentHour === sunsetHour) {
+                this.lightningPhase = 0.75;
+                this.dayPhase = 0.0;
             } else {
-                this.dayPhase = 1.0 - (hoursSinceSunrise / totalHoursDay) * 0.2;
+                this.lightningPhase = 1.0;
+                if (currentHour == 12) {
+                    this.dayPhase = 1.0;
+                } else if (currentHour < 12) {
+                    this.dayPhase = 0.5 + (hoursSinceSunrise / totalHoursDay) * 0.5;
+                } else {
+                    this.dayPhase = 1.0 - (hoursSinceSunrise / totalHoursDay) * 0.2;
+                }
             }
-        }
+        }   
 
         this.lightningPhase = this.clamp(this.lightningPhase, 0.0, 1.0);
         this.dayPhase = this.clamp(this.dayPhase, 0.0, 1.0);
-    }
-
-    initialPhase(date: Date, time: number) : number {
-        const actualTime = convertDateTime(date, time);
-        let phase = actualTime.getHours();
-        phase = this.clamp(phase, 0.0, 1.0);
-        return phase;
     }
 
     /** Render using a blendFactor to blend from dayTexture to nightTexture according to the sliderValue. */

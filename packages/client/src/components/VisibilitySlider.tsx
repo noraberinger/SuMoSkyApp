@@ -34,7 +34,7 @@ function valueText(value: number) {
 const VisibilitySlider: React.FC<VisibilitySliderProps> = ({ value, onChange }) => {
 
     return (
-        <div style={{ marginTop: '2em', padding: '0 1.75em',}}>
+        <div style={{ marginTop: '2em', padding: '0 1.75em', width: '80%'}}>
         <Slider
             size='small'
             track={false}

@@ -1,9 +1,7 @@
 import React, { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 import SunCalc from 'suncalc';
 import L from 'leaflet';
-import { convertDateTime, convertLatLngToCoords, calculateSunriseSunset } from './Utils/Calc';
-import { Button, ButtonGroup, Grid2 } from '@mui/material';
-import zIndex from '@mui/material/styles/zIndex';
+import { convertDateTime, convertLatLngToCoords, calculateSunTimes } from './Utils/Calc';
 
 interface SunMoonPositionProps {
     mapRef: React.MutableRefObject<L.Map | null>;
@@ -14,8 +12,10 @@ interface SunMoonPositionProps {
     setPositionMoon: React.Dispatch<React.SetStateAction<{azimuth: number; altitude: number;}>>;
     showSun: boolean;
     showMoon: boolean;
-    setSunTimes: React.Dispatch<React.SetStateAction<{ sunrise: string; sunset: string;}>>;
+    setSunTimes: React.Dispatch<React.SetStateAction<{ sunrise: string; sunset: string; goldenHourMorning: string; goldenHourEvening: string; blueHourMorning: string; blueHourEvening: string}>>;
     setMoonTimes: React.Dispatch<React.SetStateAction<{ rise: string; set: string;}>>;
+    setMoonPhase:  React.Dispatch<React.SetStateAction<{ phase: string }>>;
+    setIsSupermoon: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 /** Returns object with sun altitude above horizon and sun azimuth. Both in radians. */
@@ -24,21 +24,55 @@ const calculateSunPosition = (lat: number, lng: number, dateTime: Date) : { azim
     return { azimuth: position.azimuth, altitude: position.altitude };
 }
 
-const calculateMoonPosition = (lat: number, lng: number, dateTime: Date) : { azimuth: number, altitude: number} => {
+const calculateMoonPosition = (lat: number, lng: number, dateTime: Date) : { azimuth: number, altitude: number, distance: number} => {
     const azimuth = 0;
-    const  altitude = 0;
+    const altitude = 0;
+    const distance = 0;
     try {
         const position = SunCalc.getMoonPosition(dateTime, lat, lng);
-        return { azimuth: position.azimuth, altitude: position.altitude };
+        return { azimuth: position.azimuth, altitude: position.altitude, distance: position.distance };
 
     } catch(e){console.warn('Error calculating moon position:', e);}
 
-    return { azimuth, altitude };
+    return { azimuth, altitude, distance };
 }
 
 const calculateMoonTimes = (date: Date, lat: number, lng: number) : { rise: Date, set: Date} => {
     const times = SunCalc.getMoonTimes(date, lat, lng, true);
     return { rise: times.rise, set: times.set};
+}
+
+const calculateMoonPhase = (date: Date) : { phase: number } => {
+    const illumination = SunCalc.getMoonIllumination(date);
+    return { phase: illumination.phase };
+}
+
+const fullMoonTreshold = [0.48, 0.53];
+
+const getMoonPhase = (phase: number): string => {
+    if (phase === 0) return 'New Moon';
+    if (phase === 0.25) return 'First Quarter';
+    if (phase >= fullMoonTreshold[0], phase <= fullMoonTreshold[1]) return 'Full Moon';
+    if (phase === 0.75) return 'Last Quarter';
+    if (phase > 0 && phase < 0.25) return 'Waxing Crescent';
+    if (phase > 0.25 && phase < 0.48) return 'Waxing Gibbous';
+    if (phase > 0.53 && phase < 0.75) return 'Waning Gibbous';
+    if (phase > 0.75 && phase < 1) return 'Waning Crescent';
+
+
+    console.warn('Moon phases not ready.');
+    return '';
+}
+
+//TODO: find good numbers, check if correct for new moon phase as well
+const calculateSupermoon = (distance: number, phase: number) : boolean => {
+    const perigge = 356907;
+    const treshold = 12000
+
+    if (Math.abs(distance-perigge) <= treshold && phase >= fullMoonTreshold[0] && phase <= fullMoonTreshold[1]){
+        return true;
+    }
+    return false;
 }
 
 const getAnchorPoint = (lat: number, lng: number, azimuth: number, distance: number) : { lat: number, lng: number } => {
@@ -73,7 +107,7 @@ const drawCircleMarker = (latAnchor: number, lngAnchor: number, radius: number, 
     return circleMarker;
 }
 
-export const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, date, time, setPositionSun, setPositionMoon, showSun, showMoon, setSunTimes, setMoonTimes }) => {
+export const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, date, time, setPositionSun, setPositionMoon, showSun, showMoon, setSunTimes, setMoonTimes, setMoonPhase, setIsSupermoon }) => {
 
     const celestialBodies = useMemo(() => {
         if (center) {
@@ -82,13 +116,15 @@ export const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, cen
     
             const positionSun = calculateSunPosition(lat, lng, sliderDateTime);
             setPositionSun(positionSun);
-            const sunTimes = calculateSunriseSunset(lat, lng, date);
+            const sunTimes = calculateSunTimes(lat, lng, date);
 
             const positionMoon = calculateMoonPosition(lat, lng, sliderDateTime);
             setPositionMoon(positionMoon);
-            const  moonTimes = calculateMoonTimes(date, lat, lng);
+            const moonTimes = calculateMoonTimes(date, lat, lng);
+            const moonPhase = calculateMoonPhase(date);
+            setIsSupermoon(calculateSupermoon(positionMoon.distance, moonPhase.phase));
 
-            return { sunTimes, moonTimes, positionMoon, positionSun };
+            return { sunTimes, moonTimes, positionMoon, positionSun, moonPhase };
         }
         return undefined;
      
@@ -112,6 +148,8 @@ export const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, cen
             const sunsetTime = celestialBodies.sunTimes.sunset;
             const riseTime = celestialBodies.moonTimes.rise;
             const setTime = celestialBodies.moonTimes.set;
+            const moonPhase = celestialBodies.moonPhase.phase;
+            setMoonPhase({ phase: getMoonPhase(moonPhase) });
 
             if (sunriseTime && sunsetTime && showSun) {
                 const sunbeamAnchor = getAnchorPoint(lat, lng, celestialBodies.positionSun.azimuth, sunbeamDistance);
@@ -132,10 +170,14 @@ export const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, cen
                 
                 const sunrise = `${celestialBodies.sunTimes.sunrise.getHours()}:${celestialBodies.sunTimes.sunrise.getMinutes().toString().padStart(2, '0')}`;
                 const sunset = `${celestialBodies.sunTimes.sunset.getHours()}:${celestialBodies.sunTimes.sunset.getMinutes().toString().padStart(2, '0')}`;
-                setSunTimes({ sunrise, sunset });
+                const goldenHourMorning = `${celestialBodies.sunTimes.goldenHourMorning.getHours()}:${celestialBodies.sunTimes.goldenHourMorning.getMinutes().toString().padStart(2, '0')}`;
+                const goldenHourEvening = `${celestialBodies.sunTimes.goldenHourEvening.getHours()}:${celestialBodies.sunTimes.goldenHourEvening.getMinutes().toString().padStart(2, '0')}`;
+                const blueHourMorning = `${celestialBodies.sunTimes.blueHourMorning.getHours()}:${celestialBodies.sunTimes.blueHourMorning.getMinutes().toString().padStart(2, '0')}`;
+                const blueHourEvening = `${celestialBodies.sunTimes.blueHourEvening.getHours()}:${celestialBodies.sunTimes.blueHourEvening.getMinutes().toString().padStart(2, '0')}`;
+                setSunTimes({ sunrise, sunset, goldenHourMorning, goldenHourEvening, blueHourMorning, blueHourEvening });
                 
                 L.layerGroup([sunCircle, sunbeamLine, sunbeamBall, sunrisebeamLine, sunsetbeamLine]).addTo(map);
-            } else { console.warn('Times for sun not yet ready.'); }
+            } else { console.warn('Times for sun not ready.'); }
 
             if(riseTime && setTime && showMoon) {
                 const moonbeamAnchor = getAnchorPoint(lat, lng, celestialBodies.positionMoon.azimuth, moonbeamDistance);
@@ -159,9 +201,9 @@ export const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, cen
                 setMoonTimes({ rise, set });
 
                 L.layerGroup([moonCircle, moonbeamLine, moonbeamBall, moonriseLine, moonsetLine]).addTo(map);
-            } else { console.warn('Times for moon not yet ready.'); }
+            } else { console.warn('Times for moon not ready.'); }
     
-        } else { console.warn('Map is not ready yet. Clearing of canvas is not yet possible.'); }
+        } else { console.warn('Map is not ready. Clearing of canvas is not yet possible.'); }
 
     }, [center, celestialBodies, showSun, showMoon]);
 

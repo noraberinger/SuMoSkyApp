@@ -34,8 +34,9 @@ function valueText(value: number) {
 const ElevationSlider: React.FC<ElevationSliderProps> = ({ value, onChange }) => {
 
     return (
-        <div style={{ marginTop: '2em', padding: '0 1.75em',}}>
+        <div style={{ marginTop: '2em', padding: '0 1.75em', marginBottom: '2em', height: '91%', width: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
         <Slider
+            orientation='vertical'
             size='small'
             track={false}
             defaultValue={value}

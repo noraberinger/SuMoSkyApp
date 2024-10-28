@@ -2,6 +2,7 @@ import React from 'react';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import dayjs, { Dayjs } from 'dayjs';
+import zIndex from '@mui/material/styles/zIndex';
 
 interface CalendarProps {
     selectedDate: Date;
@@ -26,12 +27,13 @@ const Calendar: React.FC<CalendarProps> = ({ selectedDate, onChange }) => {
     };
 
     return (
-        <div style={{paddingRight: '0.5em'}}>
+        <div style={{paddingRight: '0.5em', zIndex: 1600}}>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
                 minDate={startDate}
                 value={dayjs(selectedDate)}
                 onChange={handleDateChange}
+                slotProps={{ popper: {sx: {zIndex: 1600,},}, }}
                 sx={(theme)=> ({ width: "100%", "& .MuiInputBase-root": { backgroundColor: theme.palette.primary.light }})}
                 />
             </LocalizationProvider>

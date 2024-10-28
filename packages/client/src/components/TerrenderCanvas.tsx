@@ -169,7 +169,7 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
     try{
       /** Initialize Canvas objects and input handler */
       terrenderRef.current =new CustomTerrender(gl, config, config.initialCamera as object);
-      skyquadRef.current = new SkyQuadBlended(gl, date, time);
+      skyquadRef.current = new SkyQuadBlended(gl, date, time, center);
       sunRef.current = new Sun(gl, positionSun);
       moonRef.current = new Moon(gl, positionMoon);
       gl.enable(gl.DEPTH_TEST);
@@ -320,11 +320,12 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
   
   return (
     <>
-    <canvas 
+    <canvas
     ref={canvasRef}
     style={{
       width: '100%',
-      height: '100%'}}
+      height: '100%',
+      overflow: 'hidden'}}
     />
     <div id='top-down-mode-button' style={{position: 'absolute', bottom: '1em', right: '1em'}}>
       <Button variant='contained' color='info' onClick={toggleTopDownMode} size='small'>

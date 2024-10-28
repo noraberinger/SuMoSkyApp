@@ -12,6 +12,7 @@ import SunMoonPositionCalc from './components/SunMoonPositionCalc';
 import ElevationSlider from './components/ElevationSlider';
 import VisibilitySlider from './components/VisibilitySlider';
 import { ExpandMore as ExpandMoreIcon, WbSunny as SunIcon, Bedtime as MoonIcon } from '@mui/icons-material';
+import Sun from './components/Utils/Sun';
 
 interface ClientConfig {
   tileSideLength?: number;
@@ -79,10 +80,13 @@ const App: React.FC = () => {
   const [showMoon, setShowMoon] = useState(true);
 
   /** Accordion information for sun and moon times */
-  const initialSunTimes = { sunrise: '', sunset: ''};
-  const [sunTimes, setSunTimes] = useState<{ sunrise: string, sunset: string; }>(initialSunTimes);
+  const initialSunTimes = { sunrise: '', sunset: '', goldenHourMorning: '', goldenHourEvening: '', blueHourMorning: '', blueHourEvening: ''};
+  const [sunTimes, setSunTimes] = useState<{ sunrise: string, sunset: string; goldenHourMorning: string; goldenHourEvening: string; blueHourMorning: string; blueHourEvening: string}>(initialSunTimes);
   const initialMoonTimes = { rise: '', set: ''};
   const [moonTimes, setMoonTimes] = useState<{ rise: string, set: string; }>(initialMoonTimes);
+  const initialMoonPhase = { phase: '' };
+  const [isSupermoon, setIsSupermoon] = useState<boolean>(false);
+  const [moonPhase, setMoonPhase] = useState<{ phase: string }>(initialMoonPhase);
   const [expandedSunAccordion, setExpandedSunAccordion] = useState(false);
   const [expandedMoonAccordion, setExpandedMoonAccordion] = useState(false);
 
@@ -149,11 +153,11 @@ const App: React.FC = () => {
     <>
     {/* UI */}
     {isDTLVisible && (
-    <Grid spacing={1} container sx={{ maxHeight: '20vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1000, backgroundColor: 'rgba(60,60,60,0.6)'}}>
+    <Grid spacing={1} container sx={{ maxHeight: '20vh', width: '100%', position: 'absolute', top: '0em', left: '0em', zIndex: 1600, backgroundColor: 'rgba(60,60,60,0.6)'}}>
       <Grid sx={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}} size={{xs:12, md:3}}>
         <SearchField map={mapRef.current} setCenter={setCenter} setMarkers={setMarkers} maxMarkers={MAX_MARKER} />
       </Grid>
-      <Grid sx={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}} size={{xs:12, md:3}}>
+      <Grid sx={{display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 1600}} size={{xs:12, md:3}}>
         <Calendar selectedDate={selectedDate} onChange={setSelectedDate} />
       </Grid>
       <Grid size={{xs:12, md:6}}>
@@ -161,63 +165,59 @@ const App: React.FC = () => {
       </Grid>
     </Grid>
     )}
-    <Grid sx={{ position: 'absolute', top: 4, right: 10, zIndex: 1500, display: 'flex', flexDirection: 'column-reverse', justifyContent: 'center' }}>
+    <Grid sx={{ position: 'absolute', top: '0.25em', right: '0.625em', zIndex: 2500, display: 'flex', flexDirection: 'column-reverse', justifyContent: 'center' }}>
         <Switch checked={isDTLVisible} onChange={handleToggle} size='medium'/>
     </Grid>
     { /* Map container */}
     <Grid spacing={1} container height={'100%'}> 
       <Grid  size={{xs:12, md:6}}>
-        <LeafletMap mapRef={mapRef} center={center} markers={markers} setMarkers={setMarkers} setCenter={setCenter}/>
+        <LeafletMap mapRef={mapRef} center={center} markers={markers} setMarkers={setMarkers} setCenter={setCenter} isDTLVisible={isDTLVisible}/>
         <Grid id="sunMoonPositionCalc" style={{position: 'absolute', zIndex: 1500}}>
-          <SunMoonPositionCalc mapRef={mapRef} center={center} date={selectedDate} time={sliderTime} setPositionSun={setPositionSun} setPositionMoon={setPositionMoon} showSun={showSun} showMoon={showMoon} setSunTimes={setSunTimes} setMoonTimes={setMoonTimes} />
+          <SunMoonPositionCalc mapRef={mapRef} center={center} date={selectedDate} time={sliderTime} setPositionSun={setPositionSun} setPositionMoon={setPositionMoon} showSun={showSun} showMoon={showMoon} setSunTimes={setSunTimes} setMoonTimes={setMoonTimes} setMoonPhase={setMoonPhase} setIsSupermoon={setIsSupermoon}/>
         </Grid>
-        <Grid sx={{ position: 'absolute', display: 'flex', zIndex: 1500, top: '110px', left: '52em' }}>
+        <Grid sx={{ position: 'absolute', display: 'flex', zIndex: 1500, top: isDTLVisible ? '5.65em' : '0.3em', left: '52em' }}>
             <ButtonGroup orientation='vertical' aria-label='SunAndMoonControls' variant='contained' color='info' size='small'>
-                <Button onClick={() => setShowSun(!showSun)}>Show     <SunIcon/></Button>
-                <Button onClick={() => setShowMoon(!showMoon)}>Show     <MoonIcon/></Button>
+                <Button onClick={() => setShowSun(!showSun)}>{showSun ? 'Hide ' : 'Show '}<SunIcon/></Button>
+                <Button onClick={() => setShowMoon(!showMoon)}>{showMoon ? 'Hide ' : 'Show '}<MoonIcon/></Button>
             </ButtonGroup>
         </Grid>
-        <Grid sx={{ position: 'absolute', display: 'flex', zIndex: 2000, top: '180px', left: '48em' }}>
-          <Accordion expanded={expandedSunAccordion} onChange={() => handleAccordionToggle('sun')} sx={{ boxShadow: 'none', width: '150px', height: '30px', '& .MuiAccordionSummary-root': { backgroundColor: 'info.main', paddingLeft: '8px',}, '& .MuiAccordionDetails-root': { padding: '0px'}, '& .MuiTypography-root': { color: 'white', background: 'rgb(2, 136, 209)', fontSize: '0.85rem', fontWeight: 'bold', lineHeight: 'normal'},}}>
+        <Grid sx={{ position: 'absolute', display: 'flex', zIndex: 1600, top: isDTLVisible ? '10.025em' : '4.675em', left: '44.2em' }}>
+          <Accordion expanded={expandedSunAccordion} onChange={() => handleAccordionToggle('sun')} sx={{ boxShadow: 'none', width: '13em', height: '1.875em', '& .MuiAccordionSummary-root': { backgroundColor: 'info.main', paddingLeft: '0.5em',}, '& .MuiAccordionDetails-root': { padding: '0em'}, '& .MuiTypography-root': { color: 'white', background: 'rgb(2, 136, 209)', fontSize: '0.85rem', fontWeight: 'bold', lineHeight: 'normal'},}}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls="SunTimes" id="SunTimes">
               <Typography>SUN TIMES</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Typography>
+                Start Blue Hour AM: {sunTimes.blueHourMorning} {getAmPm(sunTimes.blueHourMorning)}<br />
                 Sunrise: {sunTimes.sunrise} {getAmPm(sunTimes.sunrise)}<br />
-                Sunset: {sunTimes.sunset} {getAmPm(sunTimes.sunset)}
+                End Golden Hour AM: {sunTimes.goldenHourMorning} {getAmPm(sunTimes.goldenHourMorning)}<br />
+                Start Golden Hour PM: {sunTimes.goldenHourEvening} {getAmPm(sunTimes.goldenHourEvening)}<br />
+                Sunset: {sunTimes.sunset} {getAmPm(sunTimes.sunset)}<br />
+                Start Blue Hour PM: {sunTimes.blueHourEvening} {getAmPm(sunTimes.blueHourEvening)}
               </Typography>
             </AccordionDetails>
           </Accordion>
         </Grid>
-        <Grid sx={{ position: 'absolute', display: 'flex', zIndex: 1500, top: '235px', left: '48em' }}>
-          <Accordion expanded={expandedMoonAccordion} onChange={() => handleAccordionToggle('moon')} sx={{ boxShadow: 'none', width: '150px', height: '30px', '& .MuiAccordionSummary-root': { backgroundColor: 'info.main', paddingLeft: '8px',}, '& .MuiAccordionDetails-root': { padding: '0px'}, '& .MuiTypography-root': { color: 'white', background: 'rgb(2, 136, 209)', fontSize: '0.85rem', fontWeight: 'bold', lineHeight: 'normal'},}}>
+        <Grid sx={{ position: 'absolute', display: 'flex', zIndex: 1500, top: isDTLVisible ? '13.175em' : '7.825em', left: '44.2em' }}>
+          <Accordion expanded={expandedMoonAccordion} onChange={() => handleAccordionToggle('moon')} sx={{ boxShadow: 'none', width: '13em', height: '1.875em', '& .MuiAccordionSummary-root': { backgroundColor: 'info.main', paddingLeft: '0.5em',}, '& .MuiAccordionDetails-root': { padding: '0em'}, '& .MuiTypography-root': { color: 'white', background: 'rgb(2, 136, 209)', fontSize: '0.85rem', fontWeight: 'bold', lineHeight: 'normal'},}}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls="MoonTimes" id="MoonTimes">
               <Typography>MOON TIMES</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Typography>
                 Rise: {moonTimes.rise} {getAmPm(moonTimes.rise)}<br />
-                Set: {moonTimes.set} {getAmPm(moonTimes.set)}
+                Set: {moonTimes.set} {getAmPm(moonTimes.set)}<br />
+                Moon Phase: {moonPhase.phase}<br />
+                {isSupermoon ? 'Supermoon' : ''}
               </Typography>
             </AccordionDetails>
           </Accordion>
         </Grid>
       </Grid> 
-      <Grid size={{ xs: 12, md: 6 }} sx={{ position: 'relative', maxHeight: "100%", overflow: "hidden" }}>
+      <Grid size={{ xs: 12, md: 6 }} sx={{ position: 'relative', maxHeight: "100%", overflow: "hidden"}}>
         {clientConfig ? (
           <>
             <TerrenderCanvas config={clientConfig} center={center} time={sliderTime} date={selectedDate} positionSun={positionSun} positionMoon={positionMoon} />
-            <Grid sx={{ position: 'absolute', bottom: '1em', left: '1em', minHeight: '100%', zIndex: 1500, display: 'flex', alignItems: 'center' }}>
-              {showElevationSlider && (
-                <ElevationSlider value={sliderElevation} onChange={setSliderElevation}/>
-              )}
-            </Grid>
-            <Grid sx={{ position: 'absolute', top: 40, left: '1em', minWidth: '100%', zIndex: 1500, display: 'flex', alignItems: 'center'}}>
-              {showVisibilitySlider && (
-                <VisibilitySlider value={sliderVisibility} onChange={setSliderVisibility}/>
-              )}
-            </Grid>
             <Fab color='info' aria-label='Elevation/Visibility' onClick={handleFabClick} sx={{ position: 'absolute', bottom: 60, right: '1em', zIndex: 1500 }}>
                 <TuneIcon />
             </Fab>
@@ -226,7 +226,18 @@ const App: React.FC = () => {
           <div>Loading config</div>
         )}
         {error ? <div>Error: {error}</div> : null}
+        
       </Grid>
+      <Grid sx={{ position: 'absolute', bottom: '3em', left: '58em', top: isDTLVisible ? '5.25em' : '0em', height: isDTLVisible ? '90.9%' : '100%', zIndex: 2000, display: 'flex', alignItems: 'center', backgroundColor: 'rgba(60,60,60,0.6)', overflow: "visible"}}>
+              {showElevationSlider && (
+                <ElevationSlider value={sliderElevation} onChange={setSliderElevation}/>
+              )}
+            </Grid>
+            <Grid sx={{ position: 'absolute', top: isDTLVisible ? '5.25em' : '0em', left: '66em', width: '50%', zIndex: 2000, display: 'flex', alignItems: 'center', backgroundColor: 'rgba(60,60,60,0.6)', overflow: 'hidden'}}>
+              {showVisibilitySlider && (
+                <VisibilitySlider value={sliderVisibility} onChange={setSliderVisibility}/>
+              )}
+            </Grid>
     </Grid>
     </>
   );
