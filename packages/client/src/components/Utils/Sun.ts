@@ -43,14 +43,14 @@ class Sun {
     }
 
     //TODO: Radius
-    public initialPosition(positionSun: {azimuth: number; altitude: number}) : {x: number, y: number, z: number} {
+    private initialPosition(positionSun: {azimuth: number; altitude: number}) : {x: number, y: number, z: number} {
         const x = this.radius * Math.cos(positionSun.altitude) * Math.sin(positionSun.azimuth);
         const y = this.radius * Math.sin(positionSun.altitude);
         const z = this.radius* Math.cos(positionSun.altitude) * Math.cos(positionSun.azimuth);
         return {x, y, z};
     }
 
-    public updatePosition(x: number, y: number, z: number) : void {
+    private updatePosition(x: number, y: number, z: number) : void {
         this.position.x = x;
         this.position.y = y;
         this.position.z = z;

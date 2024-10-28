@@ -1,7 +1,9 @@
-import React, { Dispatch, SetStateAction, useEffect, useMemo } from 'react';
+import React, { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 import SunCalc from 'suncalc';
 import L from 'leaflet';
 import { convertDateTime, convertLatLngToCoords, calculateSunriseSunset } from './Utils/Calc';
+import { Button, ButtonGroup, Grid2 } from '@mui/material';
+import zIndex from '@mui/material/styles/zIndex';
 
 interface SunMoonPositionProps {
     mapRef: React.MutableRefObject<L.Map | null>;
@@ -10,6 +12,10 @@ interface SunMoonPositionProps {
     time: number
     setPositionSun: React.Dispatch<React.SetStateAction<{azimuth: number; altitude: number;}>>;
     setPositionMoon: React.Dispatch<React.SetStateAction<{azimuth: number; altitude: number;}>>;
+    showSun: boolean;
+    showMoon: boolean;
+    setSunTimes: React.Dispatch<React.SetStateAction<{ sunrise: string; sunset: string;}>>;
+    setMoonTimes: React.Dispatch<React.SetStateAction<{ rise: string; set: string;}>>;
 }
 
 /** Returns object with sun altitude above horizon and sun azimuth. Both in radians. */
@@ -67,8 +73,9 @@ const drawCircleMarker = (latAnchor: number, lngAnchor: number, radius: number, 
     return circleMarker;
 }
 
-const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, date, time, setPositionSun, setPositionMoon }) => {
-   const celestialBodies = useMemo(() => {
+export const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, date, time, setPositionSun, setPositionMoon, showSun, showMoon, setSunTimes, setMoonTimes }) => {
+
+    const celestialBodies = useMemo(() => {
         if (center) {
             const { lat, lng } = convertLatLngToCoords(center);
             const sliderDateTime = convertDateTime(date, time);
@@ -76,7 +83,7 @@ const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, da
             const positionSun = calculateSunPosition(lat, lng, sliderDateTime);
             setPositionSun(positionSun);
             const sunTimes = calculateSunriseSunset(lat, lng, date);
-    
+
             const positionMoon = calculateMoonPosition(lat, lng, sliderDateTime);
             setPositionMoon(positionMoon);
             const  moonTimes = calculateMoonTimes(date, lat, lng);
@@ -106,7 +113,7 @@ const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, da
             const riseTime = celestialBodies.moonTimes.rise;
             const setTime = celestialBodies.moonTimes.set;
 
-            if (sunriseTime && sunsetTime && riseTime && setTime) {
+            if (sunriseTime && sunsetTime && showSun) {
                 const sunbeamAnchor = getAnchorPoint(lat, lng, celestialBodies.positionSun.azimuth, sunbeamDistance);
                 const sunbeamLine = drawPolyline(center, sunbeamAnchor.lat, sunbeamAnchor.lng, 'yellow', 2);
                 sunbeamLine.bindTooltip('Sun position', {sticky: true, direction:'auto'});
@@ -122,7 +129,15 @@ const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, da
                 const sunsetbeamAnchor = getAnchorPoint(lat, lng, sunsetPosition.azimuth, sunbeamDistance);
                 const sunsetbeamLine = drawPolyline(center, sunsetbeamAnchor.lat, sunsetbeamAnchor.lng, 'red', 2);
                 sunsetbeamLine.bindTooltip(`Sunset at ${celestialBodies.sunTimes.sunset.getHours()}:${celestialBodies.sunTimes.sunset.getMinutes().toString().padStart(2, '0')}`, {sticky: true, direction:'auto'});
+                
+                const sunrise = `${celestialBodies.sunTimes.sunrise.getHours()}:${celestialBodies.sunTimes.sunrise.getMinutes().toString().padStart(2, '0')}`;
+                const sunset = `${celestialBodies.sunTimes.sunset.getHours()}:${celestialBodies.sunTimes.sunset.getMinutes().toString().padStart(2, '0')}`;
+                setSunTimes({ sunrise, sunset });
+                
+                L.layerGroup([sunCircle, sunbeamLine, sunbeamBall, sunrisebeamLine, sunsetbeamLine]).addTo(map);
+            } else { console.warn('Times for sun not yet ready.'); }
 
+            if(riseTime && setTime && showMoon) {
                 const moonbeamAnchor = getAnchorPoint(lat, lng, celestialBodies.positionMoon.azimuth, moonbeamDistance);
                 const moonbeamLine = drawPolyline(center, moonbeamAnchor.lat, moonbeamAnchor.lng, 'blue', 2);
                 moonbeamLine.bindTooltip('Moon position', {sticky: true, direction:'auto'});
@@ -138,14 +153,17 @@ const SunMoonPositionCalc:React.FC<SunMoonPositionProps> = ({ mapRef, center, da
                 const moonsetAnchor = getAnchorPoint(lat, lng, moonsetPosition.azimuth, moonbeamDistance);
                 const moonsetLine = drawPolyline(center, moonsetAnchor.lat, moonsetAnchor.lng, 'darkblue', 2);
                 moonsetLine.bindTooltip(`Moon sets ${celestialBodies.moonTimes.set.getHours()}:${celestialBodies.moonTimes.set.getMinutes().toString().padStart(2, '0')}`, {sticky: true, direction:'auto'});
+                
+                const rise = `${celestialBodies.moonTimes.rise.getHours()}:${celestialBodies.moonTimes.rise.getMinutes().toString().padStart(2, '0')}`;
+                const set = `${celestialBodies.moonTimes.set.getHours()}:${celestialBodies.moonTimes.set.getMinutes().toString().padStart(2, '0')}`;
+                setMoonTimes({ rise, set });
 
-                L.layerGroup([sunCircle, sunbeamLine, sunbeamBall, sunrisebeamLine, sunsetbeamLine , moonCircle, moonbeamLine, moonbeamBall, moonriseLine, moonsetLine]).addTo(map);
-
-            } else { console.warn('Times for celestial bodies not yet ready.'); }
+                L.layerGroup([moonCircle, moonbeamLine, moonbeamBall, moonriseLine, moonsetLine]).addTo(map);
+            } else { console.warn('Times for moon not yet ready.'); }
     
         } else { console.warn('Map is not ready yet. Clearing of canvas is not yet possible.'); }
 
-    }, [center, celestialBodies]);
+    }, [center, celestialBodies, showSun, showMoon]);
 
     return null;
 };

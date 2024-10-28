@@ -1,6 +1,6 @@
-import React, {useEffect, useState, useRef } from 'react';
-import { LayersControl, MapContainer, Marker, TileLayer, ZoomControl, useMap } from 'react-leaflet';
-import L, { LatLngExpression } from 'leaflet';
+import React, {useEffect, useState, useRef, Dispatch, SetStateAction } from 'react';
+import { LayerGroup, LayersControl, MapContainer, Marker, TileLayer, ZoomControl, useMap } from 'react-leaflet';
+import L, { LatLngExpression, Tooltip } from 'leaflet';
 import LocationPin from './LocationPin';
 import { Button, Snackbar, Typography } from '@mui/material';
 
@@ -78,6 +78,10 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
   const [inDeletionMode, setDeletionMode] = useState(false);
   const [openSnackbarDel, setOpenSnackbarDel] = useState(false);
   const [openSnackbarGoLocation, setOpenSnackbarGoLocation] = useState(false);
+  const [saveDTL, setSaveDTL] = useState(false);
+  const [openSnackbarDTL, setOpenSnackbarDTL] = useState(false);
+
+  //TODO add method which saves DTL
 
   const deleteMarker = (markerId: string) => {
     setMarkers((prevMarkers) => prevMarkers.filter(marker => marker.id != markerId));
@@ -102,6 +106,8 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
       setOpenSnackbarDel(false);
     } else if (openSnackbarGoLocation) {
       setOpenSnackbarGoLocation(false);
+    } else if (openSnackbarDTL) {
+      setOpenSnackbarDTL(false);
     }
   };
   
@@ -146,8 +152,11 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
       <LocationPin />
       <ZoomControl position='bottomleft'/>
       {/* Deletion of Marker */}
-      <Button variant='contained' color='info' onClick={() => {setDeletionMode(!inDeletionMode), setOpenSnackbarDel(true)}} size='small' style={{position: 'absolute', top: '110px', left: '10px', zIndex: '1000'}}>
+      <Button variant='contained' color='info' onClick={() => {setDeletionMode(!inDeletionMode), setOpenSnackbarDel(true)}} size='small' style={{position: 'absolute', top: '110px', left: '1em', zIndex: '1000'}}>
             {inDeletionMode ? 'Cancel Delete' : 'Delete Marker'}
+      </Button> 
+      <Button variant='contained' color='info' onClick={() => {setSaveDTL(!saveDTL), setOpenSnackbarDTL(true)}} size='small' style={{position: 'absolute', top: '150px', left: '1em', zIndex: '1000'}}>
+            {saveDTL ? 'Save DTL' : 'Save DTL'}
       </Button> 
       <Snackbar 
         open={openSnackbarDel}
@@ -161,6 +170,14 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
         open={openSnackbarGoLocation}
         message={
           <Typography dangerouslySetInnerHTML={{ __html: 'Moving to location of clicked marker...<br /> If no movement occurs, please uncheck and recheck the checkbox of the Marker.' }} />
+        }
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      />
+      <Snackbar 
+        open={openSnackbarDTL}
+        message={
+          <Typography dangerouslySetInnerHTML={{ __html: 'Saving current Date, Time and Location.' }} />
         }
         autoHideDuration={6000}
         onClose={handleSnackbarClose}

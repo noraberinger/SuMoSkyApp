@@ -50,7 +50,7 @@ class Moon {
         return {x, y, z};
     }
     
-    public updatePosition(x: number, y: number, z: number) : void {
+    private updatePosition(x: number, y: number, z: number) : void {
         this.position.x = x;
         this.position.y = y;
         this.position.z = z;
