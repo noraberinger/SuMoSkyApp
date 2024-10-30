@@ -2,7 +2,7 @@ import React from 'react';
 import { useRef, useEffect, useState} from 'react';
 import {Terrender, StandardInputHandler} from 'terrender-core';
 import Button from '@mui/material/Button';
-import L from 'leaflet';
+import L, { LatLngExpression } from 'leaflet';
 import SkyQuadBlended from './Utils/SkyQuadBlended';
 import Sun from './Utils/Sun';
 import Moon from './Utils/Moon';
@@ -115,7 +115,7 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
   useEffect(() => {
     if (skyquadRef.current && terrenderRef.current) {
       console.log("syncing date & time", date, time);
-      if (center instanceof L.LatLng) {
+      if (center as L.LatLngExpression) {
         skyquadRef.current.syncDateTime(date, time, center);
         terrenderRef.current.setShouldRedrawCallback(() => true);
         terrenderRef.current.setRenderLoopCallback((didDraw: boolean) => didDraw && terrenderRef.current?.setShouldRedrawCallback(() => false));

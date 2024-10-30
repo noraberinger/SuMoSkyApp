@@ -1,5 +1,6 @@
 import { LatLngExpression } from 'leaflet';
 import SunCalc from 'suncalc';
+import dayjs from 'dayjs';
 
 /** Helper function to convert value of DayTimeSlider to Date */
 export const convertDateTime = (date: Date, time: number) : Date => {
@@ -31,4 +32,13 @@ export  const convertLatLngToCoords = (latLng: LatLngExpression): { lat: number;
 export const calculateSunTimes = (lat: number, lng: number, date: Date) : { sunrise: Date, sunset: Date, goldenHourMorning: Date, goldenHourEvening: Date, blueHourMorning: Date, blueHourEvening: Date} => {
   const times = SunCalc.getTimes(date, lat, lng);
   return { sunrise: times.sunrise, sunset: times.sunset, goldenHourMorning: times.goldenHourEnd, goldenHourEvening: times.goldenHour, blueHourMorning: times.nauticalDawn, blueHourEvening: times.dusk };
+}
+
+/** Closing of any Snackbar */
+export const handleSnackbarClose = (snackbarStates: {[key: string]: boolean}, setSnackbarStates: {[key: string]: React.Dispatch<React.SetStateAction<boolean>>}) => {
+  Object.keys(snackbarStates).forEach(key => {
+    if (snackbarStates[key]) {
+      setSnackbarStates[key](false);
+    }
+  });
 }

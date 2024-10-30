@@ -47,7 +47,7 @@ const DayTimeSlider: React.FC<TimeSliderProps> = ({ value, onChange }) => {
         <Slider
             size='small'
             track={false}
-            defaultValue={value}
+            value={value}
             onChange={(e, newValue) => onChange(newValue as number)}
             marks={timeMarks}
             min={0}

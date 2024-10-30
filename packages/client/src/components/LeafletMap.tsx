@@ -1,8 +1,8 @@
-import React, {useEffect, useState, useRef, Dispatch, SetStateAction } from 'react';
+import React, {useEffect, useState, useRef } from 'react';
 import { LayerGroup, LayersControl, MapContainer, Marker, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import L, { LatLngExpression, Tooltip } from 'leaflet';
-import LocationPin from './LocationPin';
 import { Button, Snackbar, Typography } from '@mui/material';
+import { handleSnackbarClose } from './Utils/Calc';
 
 export type Marker = {
   id: string;
@@ -10,14 +10,14 @@ export type Marker = {
   position:  L.LatLngExpression
 }
 
-export interface LeafletMapSetterProps {
+interface LeafletMapSetterProps {
   mapRef: React.MutableRefObject<L.Map | null>;
   center?: L.LatLngExpression;
   setCenter: React.Dispatch<React.SetStateAction<LatLngExpression | undefined>>;
   markers: Marker[];
 }
 
-export interface LeafletMapProps extends LeafletMapSetterProps  {
+interface LeafletMapProps extends LeafletMapSetterProps  {
   setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
   isDTLVisible: boolean;
 }
@@ -79,10 +79,8 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
   const [inDeletionMode, setDeletionMode] = useState(false);
   const [openSnackbarDel, setOpenSnackbarDel] = useState(false);
   const [openSnackbarGoLocation, setOpenSnackbarGoLocation] = useState(false);
-  const [saveDTL, setSaveDTL] = useState(false);
-  const [openSnackbarDTL, setOpenSnackbarDTL] = useState(false);
-
-  //TODO add method which saves DTL
+  const snackbarStates = { openSnackbarDel, openSnackbarGoLocation };
+  const setSnackbarStates = { openSnackbarDel: setOpenSnackbarDel, openSnackbarGoLocation: setOpenSnackbarGoLocation };
 
   const deleteMarker = (markerId: string) => {
     setMarkers((prevMarkers) => prevMarkers.filter(marker => marker.id != markerId));
@@ -101,17 +99,8 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
   }
   };
 
-  /** Informing user on how to delete a marker. */
-  const handleSnackbarClose = () => {
-    if (openSnackbarDel)  {
-      setOpenSnackbarDel(false);
-    } else if (openSnackbarGoLocation) {
-      setOpenSnackbarGoLocation(false);
-    } else if (openSnackbarDTL) {
-      setOpenSnackbarDTL(false);
-    }
-  };
-  
+  const triggerSnackbarClose = () => handleSnackbarClose(snackbarStates, setSnackbarStates);
+
   return (
     <MapContainer 
       style={{width: '100%', height: '100%'}}
@@ -153,17 +142,14 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
       {/* Deletion of Marker */}
       <Button variant='contained' color='info' onClick={() => {setDeletionMode(!inDeletionMode), setOpenSnackbarDel(true)}} size='small' style={{position: 'absolute', top: isDTLVisible ? '6.875em' : '0.3em', left: '1em', zIndex: '1000'}}>
             {inDeletionMode ? 'Cancel Delete' : 'Delete Marker'}
-      </Button> 
-      <Button variant='contained' color='info' onClick={() => {setSaveDTL(!saveDTL), setOpenSnackbarDTL(true)}} size='small' style={{position: 'absolute', top: isDTLVisible ? '9.375em' : '2.9em', left: '1em', zIndex: '1000'}}>
-            {saveDTL ? 'Save DTL' : 'Save DTL'}
-      </Button> 
+      </Button>  
       <Snackbar 
         open={openSnackbarDel}
         message={
           <Typography dangerouslySetInnerHTML={{ __html: 'To delete a marker click on the marker icon of the marker you want to remove.' }} />
         }
         autoHideDuration={6000}
-        onClose={handleSnackbarClose}
+        onClose={triggerSnackbarClose}
       />
       <Snackbar 
         open={openSnackbarGoLocation}
@@ -171,15 +157,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mapRef, center, markers, setCen
           <Typography dangerouslySetInnerHTML={{ __html: 'Moving to location of clicked marker...<br /> If no movement occurs, please uncheck and recheck the checkbox of the Marker.' }} />
         }
         autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-      />
-      <Snackbar 
-        open={openSnackbarDTL}
-        message={
-          <Typography dangerouslySetInnerHTML={{ __html: 'Saving current Date, Time and Location.' }} />
-        }
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
+        onClose={triggerSnackbarClose}
       />
     </MapContainer>
   );
