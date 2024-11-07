@@ -1,55 +1,27 @@
-import globals from "globals";
-import pluginJs from "@eslint/js";
-import tseslintPlugin from "@typescript-eslint/eslint-plugin";
-import tsParser from "@typescript-eslint/parser";
-import pluginReactConfig from "eslint-plugin-react/configs/recommended.js";
-import { fixupConfigRules } from "@eslint/compat";
+import reactPlugin from "eslint-plugin-react";
 import hooksPlugin from "eslint-plugin-react-hooks";
+import eslint from "@eslint/js";
+import tseslint from "typescript-eslint";
+import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
 
-export default [
+export default tseslint.config(
+  eslint.configs.recommended,
+  ...tseslint.configs.recommended,
   {
-    files: ["**/*.{js,mjs,cjs,ts,jsx,tsx}"],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 2021,
-        sourceType: "module",
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
-      globals: {
-        ...globals.browser,
-        ...globals.node,
+    files: ["**/*.{js,mjs,cjs,jsx,mjsx,ts,tsx,mtsx}"],
+    settings: {
+      react: {
+        version: "detect",
       },
     },
   },
-  {
-    files: ["**/*.js"],
-    languageOptions: {
-      sourceType: "commonjs",
-    },
-  },
-  {
-    ignores: ["**/webpack.config.js"], 
-  },
-  pluginJs.configs.recommended, 
-  tseslintPlugin.configs.recommended, 
-  pluginReactConfig, 
+  reactPlugin.configs.flat.recommended,
+  reactPlugin.configs.flat["jsx-runtime"],
   {
     plugins: {
       "react-hooks": hooksPlugin,
     },
-    rules: {
-      ...hooksPlugin.configs.recommended.rules, 
-    },
+    rules: hooksPlugin.configs.recommended.rules,
   },
-  {
-    settings: {
-      react: {
-        version: "detect", 
-      },
-    },
-  },
-  ...fixupConfigRules(pluginReactConfig), 
-];
+  eslintPluginPrettierRecommended,
+);

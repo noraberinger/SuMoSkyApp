@@ -1,0 +1,30 @@
+{
+  "server": {
+    "hostname": "localhost",
+    "port": 3000,
+    "heightAssets": "/media/nora/MyPassport2/DataBA/heightSwitzerland",
+    "textureAssets": "/media/nora/MyPassport2/DataBA/colorSwitzerlandJpeg/colorSwitzerlandJpeg",
+    "geomErrorFolder": "/media/nora/MyPassport2/DataBA/swissGeomError",
+    "textureFolder": "../textures"
+  },
+  "client": {
+      "tileSideLength": 257,
+      "boundaries": [5.625, 45, 11.25, 47.8125],
+      "estMaxHeight": 4500,
+      "xStart": 66,
+      "yStart": 48,
+      "maxLod": 9,
+      "kPatchBase": 129,
+      "currentLod": 9,
+      "errorThreshold": 10,
+      "useCullingMetric": true,
+      "useDistanceMetric": true,
+      "useMinMaxForErrors": false,
+      "maxGpuCache": 200,
+      "maxRamCache": 400,
+      "colorIsTiff": false,
+      "colorIsJpeg": true,
+      "heightIsTiff": false,
+      "distanceMetricExponent": 1
+  }
+}

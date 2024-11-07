@@ -22,6 +22,7 @@ To run the example data follow these steps:
 
 ## License
 This project is licensed under the MIT License.
+For any Weather Data: Data provided by Open-Meteo, licensed under CC-BY 4.0
 
 ---
 

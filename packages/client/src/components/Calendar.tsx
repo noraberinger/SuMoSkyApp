@@ -1,12 +1,11 @@
-import React from 'react';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import dayjs, { Dayjs } from 'dayjs';
-import zIndex from '@mui/material/styles/zIndex';
+import React from "react";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import dayjs, { Dayjs } from "dayjs";
 
 interface CalendarProps {
-    selectedDate: Date;
-    onChange: (date: Date) => void;
+  selectedDate: Date;
+  onChange: (date: Date) => void;
 }
 
 /**
@@ -18,27 +17,32 @@ interface CalendarProps {
  * * https://mui.com/x/api/date-pickers/localization-provider/
  */
 const Calendar: React.FC<CalendarProps> = ({ selectedDate, onChange }) => {
-    const startDate = dayjs('2024-01-01');
+  const startDate = dayjs("2024-01-01");
 
-    const handleDateChange = (date: Dayjs | null) => {
-        if (date) {
-            onChange(date.toDate());
-        }
-    };
+  const handleDateChange = (date: Dayjs | null) => {
+    if (date) {
+      onChange(date.toDate());
+    }
+  };
 
-    return (
-        <div style={{paddingRight: '0.5em', zIndex: 1600}}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                minDate={startDate}
-                value={dayjs(selectedDate)}
-                onChange={handleDateChange}
-                slotProps={{ popper: {sx: {zIndex: 1600,},}, }}
-                sx={(theme)=> ({ width: "100%", "& .MuiInputBase-root": { backgroundColor: theme.palette.primary.light }})}
-                />
-            </LocalizationProvider>
-        </div>
-    )
+  return (
+    <div style={{ paddingRight: "0.5em", zIndex: 1600 }}>
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <DatePicker
+          minDate={startDate}
+          value={dayjs(selectedDate)}
+          onChange={handleDateChange}
+          slotProps={{ popper: { sx: { zIndex: 1600 } } }}
+          sx={(theme) => ({
+            width: "100%",
+            "& .MuiInputBase-root": {
+              backgroundColor: theme.palette.primary.light,
+            },
+          })}
+        />
+      </LocalizationProvider>
+    </div>
+  );
 };
 
 export default Calendar;

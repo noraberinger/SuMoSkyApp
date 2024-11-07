@@ -1,28 +1,28 @@
-import React from 'react';
-import Slider from '@mui/material/Slider';
+import React from "react";
+import Slider from "@mui/material/Slider";
 
 interface ElevationSliderProps {
-    value: number;
-    onChange: (value: number) => void;
+  value: number;
+  onChange: (value: number) => void;
 }
 
-/** Generating the marking of the slider which depict elevation above sea level in m up to 10000m */ 
+/** Generating the marking of the slider which depict elevation above sea level in m up to 10000m */
 const generateMarks = () => {
-    const marks = [];
-    for (let m = 0; m <= 10000; m+= 2000) {
-        marks.push({
-            value: m,
-            label: `${m} m`
-        });
-    }
-    return marks;
+  const marks = [];
+  for (let m = 0; m <= 10000; m += 2000) {
+    marks.push({
+      value: m,
+      label: `${m} m`,
+    });
+  }
+  return marks;
 };
 
 const marks = generateMarks();
 
 /** Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
 function valueText(value: number) {
-    return `${value}m`;
+  return `${value}m`;
 }
 
 /**
@@ -31,34 +31,47 @@ function valueText(value: number) {
  * Makes use of @mui Slider component:
  * * https://mui.com/material-ui/react-slider/
  */
-const ElevationSlider: React.FC<ElevationSliderProps> = ({ value, onChange }) => {
-
-    return (
-        <div style={{ marginTop: '2em', padding: '0 1.75em', marginBottom: '2em', height: '91%', width: '80%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-        <Slider
-            orientation='vertical'
-            size='small'
-            track={false}
-            defaultValue={value}
-            onChange={(e, newValue) => onChange(newValue as number)}
-            marks={marks}
-            min={0}
-            max={10000}
-            step={100}
-            getAriaValueText={valueText}
-            valueLabelDisplay={'on'}
-            valueLabelFormat={valueText}
-            sx={(theme) => ({
-                '& .MuiSlider-root': {
-                    backgroundColor: theme.palette.primary.light,
-                },
-                '& .MuiSlider-markLabel': {
-                    color: 'white',
-                },
-            })}
-        />
-        </div>
-    )
+const ElevationSlider: React.FC<ElevationSliderProps> = ({
+  value,
+  onChange,
+}) => {
+  return (
+    <div
+      style={{
+        marginTop: "2em",
+        padding: "0 1.75em",
+        marginBottom: "2em",
+        height: "91%",
+        width: "80%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Slider
+        orientation="vertical"
+        size="small"
+        track={false}
+        value={value}
+        onChange={(e, newValue) => onChange(newValue as number)}
+        marks={marks}
+        min={0}
+        max={10000}
+        step={100}
+        getAriaValueText={valueText}
+        valueLabelDisplay={"on"}
+        valueLabelFormat={valueText}
+        sx={(theme) => ({
+          "& .MuiSlider-root": {
+            backgroundColor: theme.palette.primary.light,
+          },
+          "& .MuiSlider-markLabel": {
+            color: "white",
+          },
+        })}
+      />
+    </div>
+  );
 };
 
 export default ElevationSlider;

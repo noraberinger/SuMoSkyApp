@@ -1,12 +1,14 @@
-import React from 'react';
-import { useRef, useEffect, useState} from 'react';
-import {Terrender, StandardInputHandler} from 'terrender-core';
-import Button from '@mui/material/Button';
-import L, { LatLngExpression } from 'leaflet';
-import SkyQuadBlended from './Utils/SkyQuadBlended';
-import Sun from './Utils/Sun';
-import Moon from './Utils/Moon';
-import { convertLatLngToCoords } from './Utils/Calc';
+import React, { useCallback } from "react";
+import { useRef, useEffect, useState } from "react";
+import { Terrender, StandardInputHandler } from "terrender-core";
+import Button from "@mui/material/Button";
+import L from "leaflet";
+import SkyQuadBlended from "./Utils/SkyQuadBlended";
+import Sun from "./Utils/Sun";
+import Moon from "./Utils/Moon";
+import { convertLatLngToCoords } from "./Utils/Calc";
+import { ThemeProvider } from "@mui/material";
+import { infoTheme } from "./Utils/ColorThemes";
 
 export interface ClientConfig {
   tileSideLength?: number;
@@ -40,42 +42,55 @@ interface TerrenderCanvasProps {
   center?: L.LatLngExpression;
   time: number;
   date: Date;
-  positionSun: {azimuth: number; altitude: number;}
-  positionMoon: {azimuth: number; altitude: number;}
+  positionSun: { azimuth: number; altitude: number };
+  positionMoon: { azimuth: number; altitude: number };
+  elevation: number;
+  visibility: number;
+  setIsTopDown: React.Dispatch<React.SetStateAction<boolean>>;
+  setSliderElevation: React.Dispatch<React.SetStateAction<number>>;
 }
 
 class CustomTerrender extends Terrender {
   preDrawCallback?: () => void = undefined;
-  
+
   setPreDrawCallback = (func: () => void) => {
     this.preDrawCallback = func;
-  }
+  };
 
-  render = () =>  {
-    this.preDrawCallback && this.preDrawCallback();
+  render = () => {
+    if (this.preDrawCallback) {
+      this.preDrawCallback();
+    }
     this.drawDefault();
-    this.drawCallback && this.drawCallback();
-  }
+    if (this.drawCallback) {
+      this.drawCallback();
+    }
+  };
 }
 
+/**
 class CustomInputHandler extends StandardInputHandler {
   minZoom: number;
   maxZoom: number;
-  camera: any;
-  constructor(terrender: Terrender, camera: any, minZoom: number, maxZoom: number) {
+  constructor(
+    terrender: Terrender,
+    camera: Camera,
+    minZoom: number,
+    maxZoom: number,
+  ) {
     super(terrender);
-    this.camera = camera;
+    this.camera = terrender.getCamera();
     this.minZoom = minZoom;
     this.maxZoom = maxZoom;
     this.onWheel = this.onWheelHandler.bind(this);
   }
 
   //TODO: Tried this to fix the overzoom effect => doesn't work aka this method is never called
-  onWheelHandler(event: any) {
+  onWheelHandler(event: WheelEvent) {
     event.preventDefault();
-    let centerOffset = [
-            (2 * event.offsetX - this.gl.canvas.width) / this.gl.canvas.width,
-            - (2 * event.offsetY - this.gl.canvas.height) / this.gl.canvas.height,
+    const centerOffset = [
+      (2 * event.offsetX - this.gl.canvas.width) / this.gl.canvas.width,
+      -(2 * event.offsetY - this.gl.canvas.height) / this.gl.canvas.height,
     ];
 
     const zoomChange = -event.deltaY * this.sensitivity;
@@ -91,25 +106,55 @@ class CustomInputHandler extends StandardInputHandler {
 
     this.moveOnViewAxis(zoomChange, centerOffset);
   }
-}
+}*/
 
 /**
  * @returns TerrenderCanvas
- * Canvas Component which renders Terrender fully as is according to config. 
+ * Canvas Component which renders Terrender fully as is according to config.
  * Where config is the output of processClientConfig.ts.
-*/
-const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time, date, positionSun, positionMoon }) => {
+ */
+const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
+  config,
+  center,
+  time,
+  date,
+  positionSun,
+  positionMoon,
+  elevation,
+  visibility,
+  setIsTopDown,
+  setSliderElevation,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const terrenderRef = useRef<CustomTerrender | null>(null);
   const inputHandlerRef = useRef<StandardInputHandler | null>(null);
   const [didInitialDraw, setDidInitialDraw] = useState(false);
   /** For toggleTopDownMode and moveToLocation in topDown */
-  const [topDown, setTopDown] = useState<{initialUp:number[]; position: number[]; posZCoord: number; target: number[]; targetXCoord: number; targetYCoord: number} | undefined>();  
+  const [topDown, setTopDown] = useState<
+    | {
+        initialUp: number[];
+        position: number[];
+        posZCoord: number;
+        target: number[];
+        targetXCoord: number;
+        targetYCoord: number;
+      }
+    | undefined
+  >();
   const topDownCamZCoord = 2;
   /** References for WebGL Objects, drawn using function drawSky */
   const skyquadRef = useRef<SkyQuadBlended | null>(null);
   const sunRef = useRef<Sun | null>(null);
   const moonRef = useRef<Moon | null>(null);
+  const dateRef = useRef<Date>(date);
+  const timeRef = useRef<number>(time);
+  const centerRef = useRef<L.LatLngExpression | undefined>(center);
+  const positionSunRef = useRef<{ azimuth: number; altitude: number }>(
+    positionSun,
+  );
+  const positionMoonRef = useRef<{ azimuth: number; altitude: number }>(
+    positionMoon,
+  );
 
   /** Sync skyQuad values when DayTimeSlider or Calendar changes */
   useEffect(() => {
@@ -118,70 +163,91 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
       if (center as L.LatLngExpression) {
         skyquadRef.current.syncDateTime(date, time, center);
         terrenderRef.current.setShouldRedrawCallback(() => true);
-        terrenderRef.current.setRenderLoopCallback((didDraw: boolean) => didDraw && terrenderRef.current?.setShouldRedrawCallback(() => false));
+        terrenderRef.current.setRenderLoopCallback(
+          (didDraw: boolean) =>
+            didDraw &&
+            terrenderRef.current?.setShouldRedrawCallback(() => false),
+        );
         terrenderRef.current.requestRender();
       }
     }
-  }, [date, time]);
+  }, [center, date, time]);
 
   useEffect(() => {
     if (sunRef.current && terrenderRef.current) {
-      console.log("syncing sun position", date, time, center);
-      if (positionSun) {
-        sunRef.current.animate(positionSun);
+      if (time || date || positionSun || center) {
         terrenderRef.current.setShouldRedrawCallback(() => true);
-        terrenderRef.current.setRenderLoopCallback((didDraw: boolean)=> didDraw &&terrenderRef.current?.setShouldRedrawCallback(() => false));
+        terrenderRef.current.setRenderLoopCallback(
+          (didDraw: boolean) =>
+            didDraw &&
+            terrenderRef.current?.setShouldRedrawCallback(() => false),
+        );
         terrenderRef.current.requestRender();
+        sunRef.current.animate(positionSun);
       }
     }
-  }, [positionSun]);
+  }, [time, positionSun, date, center]);
 
   useEffect(() => {
     if (moonRef.current && terrenderRef.current) {
-      console.log("syncing moon position", date, time, center);
       if (positionMoon) {
         moonRef.current.animate(positionMoon);
         terrenderRef.current.setShouldRedrawCallback(() => true);
-        terrenderRef.current.setRenderLoopCallback((didDraw: boolean)=> didDraw &&terrenderRef.current?.setShouldRedrawCallback(() => false));
+        terrenderRef.current.setRenderLoopCallback(
+          (didDraw: boolean) =>
+            didDraw &&
+            terrenderRef.current?.setShouldRedrawCallback(() => false),
+        );
         terrenderRef.current.requestRender();
       }
     }
   }, [positionMoon]);
-    
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas){
-      console.error('Canvas reference is not set');
+    if (!canvas) {
+      console.error("Canvas reference is not set");
       return;
     }
 
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (!gl){
-      console.error('WebGL not supported');
+    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    if (!gl) {
+      console.error("WebGL not supported");
       return;
     }
 
-    if (!config){
-      console.error('Config is not loaded');
+    if (!config) {
+      console.error("Config is not loaded");
       return;
     }
 
-    try{
+    try {
       /** Initialize Canvas objects and input handler */
-      terrenderRef.current =new CustomTerrender(gl, config, config.initialCamera as object);
-      skyquadRef.current = new SkyQuadBlended(gl, date, time, center);
-      sunRef.current = new Sun(gl, positionSun);
-      moonRef.current = new Moon(gl, positionMoon);
+      terrenderRef.current = new CustomTerrender(
+        gl,
+        config,
+        config.initialCamera as object,
+      );
+      skyquadRef.current = new SkyQuadBlended(
+        gl,
+        dateRef.current,
+        timeRef.current,
+        centerRef.current,
+      );
+      sunRef.current = new Sun(gl, positionSunRef.current);
+      moonRef.current = new Moon(gl, positionMoonRef.current);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
       terrenderRef.current.setEventBased(true);
-      terrenderRef.current.setPreDrawCallback(() =>{
+      terrenderRef.current.setPreDrawCallback(() => {
         terrenderRef.current?.drawCustom(drawSky);
-     });
+      });
       terrenderRef.current.setRenderLoopCallback(() => {
         /** Check if tile data is loaded */
-        const rootTilesReady = !terrenderRef.current?.getLoadingState().isLoading();
-        if ( rootTilesReady && terrenderRef.current)  {
+        const rootTilesReady = !terrenderRef.current
+          ?.getLoadingState()
+          .isLoading();
+        if (rootTilesReady && terrenderRef.current) {
           setDidInitialDraw(true);
         }
       });
@@ -189,8 +255,8 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
       inputHandlerRef.current = new StandardInputHandler(terrenderRef.current);
       /** Render terrain */
       terrenderRef.current.start();
-    } catch (error){
-      console.error('Failed to initialize Terrender or Input Handler:', error);
+    } catch (error) {
+      console.error("Failed to initialize Terrender or Input Handler:", error);
     }
 
     /** Clean up:
@@ -198,16 +264,15 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
      *  -Release WebGL resources
      */
     return () => {
-      if (terrenderRef.current){
+      if (terrenderRef.current) {
         terrenderRef.current.running = false;
         const gl = terrenderRef.current.getGl();
-        const loseContext = gl.getExtension('WEBGL_lose_context');
+        const loseContext = gl.getExtension("WEBGL_lose_context");
         loseContext?.loseContext();
         terrenderRef.current = null;
         inputHandlerRef.current = null;
       }
-    }
-    
+    };
   }, [config]);
 
   /** Draw all elements except terrender. */
@@ -217,66 +282,126 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
       sunRef.current.render();
       moonRef.current.render();
     }
-  };  
+  };
 
   /** Calculates newPos and newTarget in order to move on terrain to a specified location.
-   * - Coordinate system gl: 
-         *      x: horizontal, +x on right => lng: E,W; 
-         *      y: vertical, +y on top;  => lat: S,N
-         *      z: backwards and forward, +z backwards => tilt.
+   * - Coordinate system gl:
+   *      x: horizontal, +x on right => lng: E,W;
+   *      y: vertical, +y on top;  => lat: S,N
+   *      z: backwards and forward, +z backwards => tilt.
    *  - newPos: [lng, lat, z], the new location of the camera. Camera is the center of the canvas.
    *  - newTarget: [lng, terrenderRef.current.getCamera().target[1], terrenderRef.current.getCamera().target[2]], the target of the camera. Camera looks at target.
    *  - elevation: raw elevation data for specific lng, lat point.
-  */
-  const getTerrainPosition = (latLng: L.LatLngExpression) : { lat: number; lng: number; zCoord: number; newPos: number[] } => {
-    const amplification = 4;
+   *  - amplification: set to 4 such that observer height is set relative to height of terrain at specified lat, lng.
+   */
+  const getTerrainPosition = useCallback(
+    (
+      latLng: L.LatLngExpression,
+    ): { lat: number; lng: number; zCoord: number; newPos: number[] } => {
+      const amplification = 4;
 
+      if (terrenderRef.current) {
+        const { lat, lng } = convertLatLngToCoords(latLng);
+        const elevation = terrenderRef.current
+          .getQuadTree()
+          .getHeightValue(lng, lat);
+        const z =
+          elevation *
+          terrenderRef.current.getParameters().heightScaling *
+          amplification;
+        const position = [lng, lat, z];
+        return { lat: lat, lng: lng, zCoord: z, newPos: position };
+      } else {
+        throw new TypeError("terrenderRef is undefined.");
+      }
+    },
+    [],
+  );
+
+  const moveToLocation = useCallback(
+    (latLng: L.LatLngExpression, additionalElevation: number) => {
+      /** If center changes while Camera is not in topDown => getCamera().target is [0, 0, 1]  */
+      const amplification = 4;
+      if (terrenderRef.current) {
+        const { newPos, zCoord } = getTerrainPosition(latLng);
+        const zCoordAdjusted =
+          additionalElevation *
+          terrenderRef.current.getParameters().heightScaling *
+          amplification;
+        const newZ = zCoord + zCoordAdjusted;
+
+        if (!topDown) {
+          setSliderElevation(Math.round(newZ));
+          const newPosition = [newPos[0], newPos[1], newZ];
+          const newTarget = terrenderRef.current.getCamera().target;
+          //newTarget[0] = newPos[0];
+          newTarget[0] = newPosition[0];
+          //terrenderRef.current.getCamera().changeCamPosition(newPos, newTarget);
+          terrenderRef.current
+            .getCamera()
+            .changeCamPosition(newPosition, newTarget);
+        } else if (topDown) {
+          /** If center changes while Camera is in topDown => getCamera().target is [0, 1, 0]*/
+          setSliderElevation(Math.round(newZ));
+          const initialUp = topDown.initialUp;
+          const position = newPos;
+          const posZCoord = zCoord;
+          const target = topDown.target;
+          const targetXCoord = target[0];
+          const targetYCoord = target[1];
+          setTopDown({
+            initialUp,
+            position,
+            posZCoord,
+            target,
+            targetXCoord,
+            targetYCoord,
+          });
+          setIsTopDown(true);
+
+          target[0] = position[0];
+          position[2] = topDownCamZCoord + additionalElevation;
+          const newTarget = [position[0], position[1], 0];
+          terrenderRef.current.getCamera().initialUp = [0, 1, 0];
+          terrenderRef.current
+            .getCamera()
+            .changeCamPosition(position, newTarget);
+        }
+      }
+    },
+    [getTerrainPosition, setIsTopDown, topDown, setSliderElevation],
+  );
+
+  //TODO log what is happening
+  const clipCamView = useCallback((visibility: number) => {
     if (terrenderRef.current) {
-      const { lat, lng } = convertLatLngToCoords(latLng);
-      const elevation = terrenderRef.current.getQuadTree().getHeightValue(lng, lat);
-      const z = elevation * terrenderRef.current.getParameters().heightScaling * amplification;
-      const position = [lng, lat, z];
-      return { lat: lat, lng: lng, zCoord: z, newPos: position};
-    } else {
-      throw new TypeError('terrenderRef is undefined.')
-    }
-  };
- 
-  const moveToLocation = (latLng: L.LatLngExpression) => {
-    /** If center changes while Camera is not in topDown => getCamera().target is [0, 0, 1]  */
-    if (terrenderRef.current && !topDown) {
-      const { newPos } = getTerrainPosition(latLng);
+      const position = terrenderRef.current.getCamera().position;
       const newTarget = terrenderRef.current.getCamera().target;
-      newTarget[0] = newPos[0];
-      terrenderRef.current.getCamera().changeCamPosition(newPos, newTarget);
-    } else if (terrenderRef.current && topDown) {
-      /** If center changes while Camera is in topDown => getCamera().target is [0, 1, 0]*/
-      const { zCoord, newPos } = getTerrainPosition(latLng);
-      const initialUp = topDown.initialUp;
-      const position = newPos;
-      const posZCoord = zCoord;
-      const target = topDown.target;
-      const targetXCoord = target[0];
-      const targetYCoord = target[1];
-      setTopDown({initialUp, position, posZCoord, target, targetXCoord, targetYCoord});
-
-      target[0] = position[0]
-      position[2] = topDownCamZCoord;
-      const newTarget = [position[0], position[1], 0];
-      terrenderRef.current.getCamera().initialUp = [0, 1, 0];
+      const amplification = 4;
+      const scaling = 0.000025;
+      const z = visibility * amplification * scaling;
+      newTarget[2] = z;
       terrenderRef.current.getCamera().changeCamPosition(position, newTarget);
     }
-  };
-  
-  /** If center changes and didInitialDraw => moveToLocation.
+  }, []);
+
+  /** If center or elevation changes and didInitialDraw => moveToLocation.
    * - didInitialDraw is true when tiles finished loading.
    */
+  //TODO: When loading setSliderElevation === 0, one initialization slider at 0 or set to actual elevation of position which is the elevation relative to terrain data. e.g. 0.507 for Zurich => slider set to 507m?
   useEffect(() => {
     if (center && didInitialDraw) {
-      moveToLocation(center);
-    } 
-  }, [center, didInitialDraw]);
- 
+      moveToLocation(center, elevation);
+    }
+  }, [center, didInitialDraw, elevation, moveToLocation]);
+
+  //TODO: visibility make sure terrain not just disappears
+  useEffect(() => {
+    if (center && visibility && didInitialDraw) {
+      clipCamView(visibility);
+    }
+  }, [visibility, didInitialDraw, center, clipCamView]);
+
   /**
    * Functionality Button which allows user to change to top down view of Terrender and back.
    * Makes use of @mui Button component:
@@ -285,30 +410,41 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
   const toggleTopDownMode = () => {
     if (inputHandlerRef.current && terrenderRef.current) {
       /** Reset topDownMode */
-      if ( topDown ) { 
+      if (topDown) {
         terrenderRef.current.getCamera().position[2] = topDown.posZCoord;
         terrenderRef.current.getCamera().initialUp = topDown.initialUp;
         terrenderRef.current.getCamera().target[0] = topDown.targetXCoord;
         terrenderRef.current.getCamera().target[1] = topDown.targetYCoord;
-        terrenderRef.current.getCamera().changeCamPosition(topDown.position, topDown.target);
+        terrenderRef.current
+          .getCamera()
+          .changeCamPosition(topDown.position, topDown.target);
         setTopDown(undefined);
+        setIsTopDown(false);
       } else {
         /** Enable topDown view, Keep track of prev values using setTopDown.
-         *  - Coordinate system gl: 
-         *      x: horizontal, +x on right; 
-         *      y: vertical, +y on top; 
+         *  - Coordinate system gl:
+         *      x: horizontal, +x on right;
+         *      y: vertical, +y on top;
          *      z: backwards and forward, +z backwards.
          *  - position[2]: z-coordinate of current camera position.
          *  - target: [position[0], position[1], 0], camera looks at target => looks at current position, coordinates of target are therefore: [x: lng (E,W), y: lat (S,N), z: 0].
          *  - initialUp: v3[], "up" direction of the camera => vector pointing from inner centre in direction of the v3[].
          */
         const position = terrenderRef.current.getCamera().position;
-        const initialUp  =  terrenderRef.current.getCamera().initialUp;
-        const posZCoord = position[2]; 
+        const initialUp = terrenderRef.current.getCamera().initialUp;
+        const posZCoord = position[2];
         const target = terrenderRef.current.getCamera().target;
         const targetXCoord = target[0];
         const targetYCoord = target[1];
-        setTopDown({position, initialUp, posZCoord, target, targetXCoord, targetYCoord});
+        setTopDown({
+          position,
+          initialUp,
+          posZCoord,
+          target,
+          targetXCoord,
+          targetYCoord,
+        });
+        setIsTopDown(true);
 
         position[2] = topDownCamZCoord;
         const newTarget = [position[0], position[1], 0];
@@ -317,21 +453,32 @@ const TerrenderCanvas : React.FC<TerrenderCanvasProps> = ({ config, center, time
       }
     }
   };
-  
+
   return (
     <>
-    <canvas
-    ref={canvasRef}
-    style={{
-      width: '100%',
-      height: '100%',
-      overflow: 'hidden'}}
-    />
-    <div id='top-down-mode-button' style={{position: 'absolute', bottom: '1em', right: '1em'}}>
-      <Button variant='contained' color='info' onClick={toggleTopDownMode} size='small'>
-        {topDown ? 'Disable Top Down Mode' : 'Enable Top Down Mode'}
-      </Button>
-    </div>
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+        }}
+      />
+      <div
+        id="top-down-mode-button"
+        style={{ position: "absolute", bottom: "1em", right: "1em" }}
+      >
+        <ThemeProvider theme={infoTheme}>
+          <Button
+            variant="contained"
+            color="info"
+            onClick={toggleTopDownMode}
+            size="small"
+          >
+            {topDown ? "Disable Top Down Mode" : "Enable Top Down Mode"}
+          </Button>
+        </ThemeProvider>
+      </div>
     </>
   );
 };
