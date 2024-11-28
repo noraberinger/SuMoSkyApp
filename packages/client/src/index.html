@@ -11,6 +11,53 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
   crossorigin=""></script>
+  <style>
+    #compass {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid #666;
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    #compass-arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 40px solid #fff;
+      transform: translate(-50%, -50%) rotate(0deg);
+      transform-origin: 50% 50%;
+    }
+
+    #compass-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, 225%);
+      color: #fff;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .compass-marker {
+      position: absolute;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+  </style>
 </head>
 
 <body>

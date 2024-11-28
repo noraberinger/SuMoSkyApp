@@ -2,10 +2,11 @@ import { LatLngExpression } from "leaflet";
 import SunCalc from "suncalc";
 
 /** Helper function to convert value of DayTimeSlider to Date */
-export const convertDateTime = (date: Date, time: number): Date => {
+export const convertDateTime = (time: number): Date => {
   const hour = Math.floor(time / 6);
   const minute = (time % 6) * 10;
-  const dateTime = date;
+
+  const dateTime = new Date();
   dateTime.setHours(hour, minute, 0);
   return dateTime;
 };

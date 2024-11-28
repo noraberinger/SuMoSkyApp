@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   Accordion,
   Typography,
-  Grid2 as Grid,
   AccordionSummary,
   AccordionDetails,
 } from "@mui/material/";
@@ -53,114 +52,100 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
 
   return (
     <div>
-      <Grid
+      <Accordion
+        expanded={expandedSunAccordion}
+        onChange={() => handleAccordionToggle("sun")}
         sx={{
-          position: "absolute",
-          display: "flex",
-          zIndex: 1600,
+          boxShadow: "none",
+          minWidth: "14em",
+          minHeight: "1.875em",
+          "& .MuiAccordionSummary-root": {
+            backgroundColor: "#faf5f5",
+            paddingLeft: "0.5em",
+          },
+          "& .MuiAccordionDetails-root": { padding: "0em" },
+          "& .MuiTypography-root": {
+            color: "#333",
+            background: "#faf5f5",
+            fontSize: "0.85rem",
+            fontWeight: "bold",
+            lineHeight: "normal",
+          },
           top: isDTLVisible ? "10.025em" : "4.675em",
-          left: "44.2em",
-        }}
-      >
-        <Accordion
-          expanded={expandedSunAccordion}
-          onChange={() => handleAccordionToggle("sun")}
-          sx={{
-            boxShadow: "none",
-            width: "13em",
-            height: "1.875em",
-            "& .MuiAccordionSummary-root": {
-              backgroundColor: "#faf5f5",
-              paddingLeft: "0.5em",
-            },
-            "& .MuiAccordionDetails-root": { padding: "0em" },
-            "& .MuiTypography-root": {
-              color: "#333",
-              background: "#faf5f5",
-              fontSize: "0.85rem",
-              fontWeight: "bold",
-              lineHeight: "normal",
-            },
-          }}
-        >
-          <AccordionSummary
-            expandIcon={<ExpandMoreIcon />}
-            aria-controls="SunTimes"
-            id="SunTimes"
-          >
-            <Typography>SUN TIMES</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>
-              Start Blue Hour AM: {sunTimes.blueHourMorning}{" "}
-              {getAmPm(sunTimes.blueHourMorning)}
-              <br />
-              Sunrise: {sunTimes.sunrise} {getAmPm(sunTimes.sunrise)}
-              <br />
-              End Golden Hour AM: {sunTimes.goldenHourMorning}{" "}
-              {getAmPm(sunTimes.goldenHourMorning)}
-              <br />
-              Start Golden Hour PM: {sunTimes.goldenHourEvening}{" "}
-              {getAmPm(sunTimes.goldenHourEvening)}
-              <br />
-              Sunset: {sunTimes.sunset} {getAmPm(sunTimes.sunset)}
-              <br />
-              Start Blue Hour PM: {sunTimes.blueHourEvening}{" "}
-              {getAmPm(sunTimes.blueHourEvening)}
-            </Typography>
-          </AccordionDetails>
-        </Accordion>
-      </Grid>
-      <Grid
-        sx={{
+          zIndex: 1600,
           position: "absolute",
-          display: "flex",
-          zIndex: 1500,
-          top: isDTLVisible ? "13.175em" : "7.825em",
-          left: "44.2em",
         }}
       >
-        <Accordion
-          expanded={expandedMoonAccordion}
-          onChange={() => handleAccordionToggle("moon")}
-          sx={{
-            boxShadow: "none",
-            width: "13em",
-            height: "1.875em",
-            "& .MuiAccordionSummary-root": {
-              backgroundColor: "#faf5f5",
-              paddingLeft: "0.5em",
-            },
-            "& .MuiAccordionDetails-root": { padding: "0em" },
-            "& .MuiTypography-root": {
-              color: "#333",
-              background: "#faf5f5",
-              fontSize: "0.85rem",
-              fontWeight: "bold",
-              lineHeight: "normal",
-            },
-          }}
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          aria-controls="SunTimes"
+          id="SunTimes"
         >
-          <AccordionSummary
-            expandIcon={<ExpandMoreIcon />}
-            aria-controls="MoonTimes"
-            id="MoonTimes"
-          >
-            <Typography>MOON TIMES</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography>
-              Rise: {moonTimes.rise} {getAmPm(moonTimes.rise)}
-              <br />
-              Set: {moonTimes.set} {getAmPm(moonTimes.set)}
-              <br />
-              Moon Phase: {moonPhase.phase}
-              <br />
-              {isSupermoon ? "Supermoon" : ""}
-            </Typography>
-          </AccordionDetails>
-        </Accordion>
-      </Grid>
+          <Typography>SUN TIMES</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Typography>
+            Start Blue Hour AM: {sunTimes.blueHourMorning}{" "}
+            {getAmPm(sunTimes.blueHourMorning)}
+            <br />
+            Sunrise: {sunTimes.sunrise} {getAmPm(sunTimes.sunrise)}
+            <br />
+            End Golden Hour AM: {sunTimes.goldenHourMorning}{" "}
+            {getAmPm(sunTimes.goldenHourMorning)}
+            <br />
+            Start Golden Hour PM: {sunTimes.goldenHourEvening}{" "}
+            {getAmPm(sunTimes.goldenHourEvening)}
+            <br />
+            Sunset: {sunTimes.sunset} {getAmPm(sunTimes.sunset)}
+            <br />
+            Start Blue Hour PM: {sunTimes.blueHourEvening}{" "}
+            {getAmPm(sunTimes.blueHourEvening)}
+          </Typography>
+        </AccordionDetails>
+      </Accordion>
+      <Accordion
+        expanded={expandedMoonAccordion}
+        onChange={() => handleAccordionToggle("moon")}
+        sx={{
+          boxShadow: "none",
+          minWidth: "14em",
+          minHeight: "1.875em",
+          "& .MuiAccordionSummary-root": {
+            backgroundColor: "#faf5f5",
+            paddingLeft: "0.5em",
+          },
+          "& .MuiAccordionDetails-root": { padding: "0em" },
+          "& .MuiTypography-root": {
+            color: "#333",
+            background: "#faf5f5",
+            fontSize: "0.85rem",
+            fontWeight: "bold",
+            lineHeight: "normal",
+          },
+          top: isDTLVisible ? "13.175em" : "7.825em",
+          zIndex: 1500,
+          position: "absolute",
+        }}
+      >
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          aria-controls="MoonTimes"
+          id="MoonTimes"
+        >
+          <Typography>MOON TIMES</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Typography>
+            Rise: {moonTimes.rise} {getAmPm(moonTimes.rise)}
+            <br />
+            Set: {moonTimes.set} {getAmPm(moonTimes.set)}
+            <br />
+            Moon Phase: {moonPhase.phase}
+            <br />
+            {isSupermoon ? "Supermoon" : ""}
+          </Typography>
+        </AccordionDetails>
+      </Accordion>
     </div>
   );
 };

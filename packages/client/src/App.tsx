@@ -14,7 +14,7 @@ import LeafletMap, { positionZurich, Marker } from "./components/LeafletMap";
 import DayTimeSlider from "./components/DayTimeSlider";
 import Calendar from "./components/Calendar";
 import SearchField from "./components/SearchField";
-import SunMoonPositionCalc from "./components/SunMoonPositionCalc";
+import SunMoonPositionCalc from "./components/CelestialBodiesLeaflet";
 import ElevationSlider from "./components/ElevationSlider";
 import VisibilitySlider from "./components/VisibilitySlider";
 import {
@@ -84,20 +84,6 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(now);
   const [sliderTime, setSliderTime] = useState<number>(initialSliderTime);
 
-  /** References to positionSun and positionMoon for TerrenderCanvas rendering */
-  const initalPositionSun = { azimuth: 0, altitude: 0 };
-  const [positionSun, setPositionSun] = useState<{
-    azimuth: number;
-    altitude: number;
-  }>(initalPositionSun);
-  const initalPositionMoon = { azimuth: 0, altitude: 0 };
-  const [positionMoon, setPositionMoon] = useState<{
-    azimuth: number;
-    altitude: number;
-  }>(initalPositionMoon);
-
-  console.log(positionSun);
-
   /** Information for buttons controlling if sun/moon content rendered on Leaflet map */
   const [showSun, setShowSun] = useState(true);
   const [showMoon, setShowMoon] = useState(true);
@@ -144,12 +130,15 @@ const App: React.FC = () => {
   );
   const [showVisibilitySlider, setShowVisibilitySlider] = useState(false);
   /** Tracking Top Down Mode Terrender. Visibility feature only available when not top down. */
-  const [isTopDown, setIsTopDown] = useState<boolean>(false);
+  const [toggledTopDown, setToggledTopDown] = useState<boolean>(false);
 
   /** DTL Plans */
   const [savedPlans, setSavedPlans] = useState<Plan[]>([]);
 
-  if (error) console.log(error);
+  /** Get elevation data from Terrender */
+  const [elevation, setElevation] = useState<number>(0);
+
+  if (error) console.warn(error);
 
   /** Fetch ClientConfig from Server -> result of processClientConfig */
   useEffect(() => {
@@ -256,8 +245,14 @@ const App: React.FC = () => {
             setCenter={setCenter}
             isDTLVisible={isDTLVisible}
           />
+          {/*<Sampler
+            elevation={elevation}
+            center={center}
+            setMarkers={setMarkers}
+          />*/}
           {/* Save/Load/Delete DTL Plan */}
           <Grid
+            id="DTL"
             sx={{
               marginTop: "2em",
               padding: "0 1.75em",
@@ -284,10 +279,6 @@ const App: React.FC = () => {
               setSavedPlans={setSavedPlans}
             />
           </Grid>
-
-          {/*<Grid sx={{ top: isDTLVisible ? '6.29em' : '2.9em', left: '2em', position: 'absolute', marginTop: '2em', padding: '0 1.75em', marginBottom: '2em', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-          
-        </Grid>*/}
           {/* Sun/Moon Position */}
           <Grid
             id="sunMoonPositionCalc"
@@ -298,8 +289,6 @@ const App: React.FC = () => {
               center={center}
               date={selectedDate}
               time={sliderTime}
-              setPositionSun={setPositionSun}
-              setPositionMoon={setPositionMoon}
               showSun={showSun}
               showMoon={showMoon}
               setSunTimes={setSunTimes}
@@ -310,12 +299,15 @@ const App: React.FC = () => {
           </Grid>
           {/* Show/Hide Sun/Moon */}
           <Grid
+            id="Sun/Moon Buttongroup"
             sx={{
-              position: "absolute",
+              marginTop: "2em",
+              padding: "0 1em 0.05em 1em",
+              marginBottom: "2em",
               display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
               zIndex: 1500,
-              top: isDTLVisible ? "5.65em" : "0.3em",
-              left: "52em",
             }}
           >
             <ThemeProvider theme={infoTheme}>
@@ -325,6 +317,11 @@ const App: React.FC = () => {
                 variant="contained"
                 size="small"
                 color="info"
+                style={{
+                  position: "absolute",
+                  top: isDTLVisible ? "5.65em" : "0.3em",
+                  zIndex: "1500",
+                }}
               >
                 <Button onClick={() => setShowSun(!showSun)}>
                   {showSun ? "Hide " : "Show "}
@@ -338,7 +335,20 @@ const App: React.FC = () => {
             </ThemeProvider>
           </Grid>
           {/* PhotoFeatures */}
-          <Grid>
+          <Grid
+            id="PhotoFeatures"
+            sx={{
+              marginTop: "2em",
+              padding: "0 1em 0.05em 1em",
+              marginBottom: "2em",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "flex-end",
+              width: "100%",
+              height: "100%",
+              zIndex: 1500,
+            }}
+          >
             <PhotoFeatures
               isDTLVisible={isDTLVisible}
               sunTimes={sunTimes}
@@ -360,12 +370,12 @@ const App: React.FC = () => {
                 center={center}
                 time={sliderTime}
                 date={selectedDate}
-                positionSun={positionSun}
-                positionMoon={positionMoon}
                 elevation={sliderElevation}
                 setSliderElevation={setSliderElevation}
                 visibility={sliderVisibility}
-                setIsTopDown={setIsTopDown}
+                toggledTopDown={toggledTopDown}
+                setToggledTopDown={setToggledTopDown}
+                setElevation={setElevation}
               />
               <ThemeProvider theme={infoTheme}>
                 <Fab
@@ -423,7 +433,7 @@ const App: React.FC = () => {
             overflow: "hidden",
           }}
         >
-          {showVisibilitySlider && !isTopDown && (
+          {showVisibilitySlider && !toggledTopDown && (
             <VisibilitySlider
               value={sliderVisibility}
               onChange={setSliderVisibility}

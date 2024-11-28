@@ -1,5 +1,5 @@
 //Data provided by Open-Meteo, licensed under CC-BY 4.0
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Slider from "@mui/material/Slider";
 import { fetchWeatherApi } from "openmeteo";
 import { LatLngExpression } from "leaflet";
@@ -44,93 +44,39 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   const [forecastVisibility, setForecastVisibility] =
     useState<Float32Array | null>(null);
   const url = "https://api.open-meteo.com/v1/forecast";
-  const [params, setParams] = useState<{
-    latitude: number;
-    longitude: number;
-    hourly: string[];
-  }>({
-    latitude: 0,
-    longitude: 0,
-    hourly: ["visibility"],
-  });
+  const fetchAttempted = useRef(false);
 
-  /** Limitations in order to adhere to https://open-meteo.com/en/terms
-   * TODO: they already block to many requests.
-   */
-  const [dayCount, setDayCount] = useState<number>(0);
-  const [hourCount, setHourCount] = useState<number>(0);
-  const [minuteCount, setMinuteCount] = useState<number>(0);
-  const [prevDayReset, setPrevDayReset] = useState(Date.now());
-  const [prevHourReset, setPrevHourReset] = useState(Date.now());
-  const [prevMinuteReset, setPrevMinuteReset] = useState(Date.now());
-  const MAX_CALLS_PER_HOUR = 5000;
-  const MAX_CALLS_PER_MINUTE = 600;
-  const MAX_CALLS_PER_DAY = 10000;
-
-  const fetchVisbilityData = useCallback(async () => {
-    if (
-      dayCount >= MAX_CALLS_PER_DAY ||
-      hourCount >= MAX_CALLS_PER_HOUR ||
-      minuteCount >= MAX_CALLS_PER_MINUTE
-    ) {
-      console.warn("API call limit is reached.");
-      return;
-    }
+  //TODO add day checker => if day/hour changes should refetch data
+  const fetchVisbilityData = useCallback(async (lat: number, lng: number) => {
+    if (fetchAttempted.current) return;
+    fetchAttempted.current = true;
 
     try {
+      const params = {
+        latitude: lat,
+        longitude: lng,
+        hourly: ["visibility"],
+      };
       const responses = await fetchWeatherApi(url, params);
       const response = responses[0];
       const hourly = response.hourly();
       if (hourly) {
         const visibility = hourly.variables(0)!.valuesArray()!;
-        setForecastVisibility(visibility);
-        setDayCount((prev) => prev + 1);
-        setHourCount((prev) => prev + 1);
-        setMinuteCount((prev) => prev + 1);
+        if (visibility) setForecastVisibility(visibility);
       } else {
         console.warn("Weather data is not ready.");
       }
     } catch (error) {
       console.error("Error fetching visibility data:", error);
     }
-  }, [params, dayCount, hourCount, minuteCount]);
-
-  const updateParams = (lat: number, lng: number) => {
-    setParams((prevParams) => ({
-      ...prevParams,
-      latitude: lat,
-      longitude: lng,
-    }));
-  };
+  }, []);
 
   useEffect(() => {
-    if (center) {
+    if (center && !fetchAttempted.current) {
       const { lat, lng } = convertLatLngToCoords(center);
-      updateParams(lat, lng);
-      fetchVisbilityData();
+      fetchVisbilityData(lat, lng);
     }
   }, [center, fetchVisbilityData]);
-
-  useEffect(() => {
-    const resetCounts = () => {
-      const now = Date.now();
-      if (now - prevMinuteReset >= 60000) {
-        setMinuteCount(0);
-        setPrevMinuteReset(now);
-      }
-      if (now - prevHourReset >= 3600000) {
-        setHourCount(0);
-        setPrevHourReset(now);
-      }
-      if (now - prevDayReset >= 86400000) {
-        setDayCount(0);
-        setPrevDayReset(now);
-      }
-    };
-
-    const timeInterval = setInterval(resetCounts, 30000);
-    return () => clearInterval(timeInterval);
-  }, [prevDayReset, prevHourReset, prevMinuteReset]);
 
   return (
     <div style={{ marginTop: "2em", padding: "0 1.75em", width: "75%" }}>

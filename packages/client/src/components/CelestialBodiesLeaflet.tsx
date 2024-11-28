@@ -7,17 +7,11 @@ import {
   calculateSunTimes,
 } from "./Utils/Calc";
 
-interface SunMoonPositionProps {
+interface CelestialBodiesProps {
   mapRef: React.MutableRefObject<L.Map | null>;
   center?: L.LatLngExpression;
   date: Date;
   time: number;
-  setPositionSun: React.Dispatch<
-    React.SetStateAction<{ azimuth: number; altitude: number }>
-  >;
-  setPositionMoon: React.Dispatch<
-    React.SetStateAction<{ azimuth: number; altitude: number }>
-  >;
   showSun: boolean;
   showMoon: boolean;
   setSunTimes: React.Dispatch<
@@ -47,6 +41,34 @@ const calculateSunPosition = (
   return { azimuth: position.azimuth, altitude: position.altitude };
 };
 
+/** 
+const calculateSunPositionArray = (
+  lat: number,
+  lng: number,
+  date: Date,
+): { time: Date; azimuth: number; altitude: number }[] => {
+  const positions = [];
+  const minutesInDay = 24 * 60;
+
+  for (let minute = 0; minute < minutesInDay; minute += 10) {
+    const dateTime = new Date(date);
+    dateTime.setHours(0, minute, 0, 0);
+
+    try {
+      const position = SunCalc.getPosition(dateTime, lat, lng);
+      positions.push({
+        time: dateTime,
+        azimuth: position.azimuth,
+        altitude: position.altitude,
+      });
+    } catch (e) {
+      console.warn("Error calculcating moon position array:", e);
+      positions.push({ time: dateTime, azimuth: 0, altitude: 0 });
+    }
+  }
+  return positions;
+}; */
+
 const calculateMoonPosition = (
   lat: number,
   lng: number,
@@ -68,6 +90,35 @@ const calculateMoonPosition = (
 
   return { azimuth, altitude, distance };
 };
+
+/** 
+const calculateMoonPositionArray = (
+  lat: number,
+  lng: number,
+  date: Date,
+): { time: Date; azimuth: number; altitude: number; distance: number }[] => {
+  const positions = [];
+  const minutesInDay = 24 * 60;
+
+  for (let minute = 0; minute < minutesInDay; minute += 10) {
+    const dateTime = new Date(date);
+    dateTime.setHours(0, minute, 0, 0);
+
+    try {
+      const position = SunCalc.getMoonPosition(dateTime, lat, lng);
+      positions.push({
+        time: dateTime,
+        azimuth: position.azimuth,
+        altitude: position.altitude,
+        distance: position.distance,
+      });
+    } catch (e) {
+      console.warn("Error calculcating moon position array:", e);
+      positions.push({ time: dateTime, azimuth: 0, altitude: 0, distance: 0 });
+    }
+  }
+  return positions;
+}; */
 
 const calculateMoonTimes = (
   date: Date,
@@ -231,13 +282,11 @@ const drawArc = (
   return shadedArea;
 };
 
-export const SunMoonPositionCalc: React.FC<SunMoonPositionProps> = ({
+export const SunMoonPositionCalc: React.FC<CelestialBodiesProps> = ({
   mapRef,
   center,
   date,
   time,
-  setPositionSun,
-  setPositionMoon,
   showSun,
   showMoon,
   setSunTimes,
@@ -248,14 +297,12 @@ export const SunMoonPositionCalc: React.FC<SunMoonPositionProps> = ({
   const celestialBodies = useMemo(() => {
     if (center) {
       const { lat, lng } = convertLatLngToCoords(center);
-      const sliderDateTime = convertDateTime(date, time);
+      const sliderDateTime = convertDateTime(time);
 
       const positionSun = calculateSunPosition(lat, lng, sliderDateTime);
-
       const sunTimes = calculateSunTimes(lat, lng, date);
 
       const positionMoon = calculateMoonPosition(lat, lng, sliderDateTime);
-
       const moonTimes = calculateMoonTimes(date, lat, lng);
       const moonPhase = calculateMoonPhase(date);
 
@@ -288,8 +335,6 @@ export const SunMoonPositionCalc: React.FC<SunMoonPositionProps> = ({
 
   useEffect(() => {
     if (mapRef.current && center && celestialBodies) {
-      setPositionSun(celestialBodies.positionSun);
-      setPositionMoon(celestialBodies.positionMoon);
       setIsSupermoon(
         calculateSupermoon(
           celestialBodies.positionMoon.distance,
@@ -562,8 +607,6 @@ export const SunMoonPositionCalc: React.FC<SunMoonPositionProps> = ({
     setMoonPhase,
     setSunTimes,
     setMoonTimes,
-    setPositionSun,
-    setPositionMoon,
     setIsSupermoon,
   ]);
 

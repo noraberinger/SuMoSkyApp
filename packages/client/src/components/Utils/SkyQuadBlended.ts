@@ -93,7 +93,7 @@ class SkyQuadBlended {
     center: L.LatLngExpression | undefined,
   ): void {
     if (center) {
-      const actualTime = convertDateTime(date, time);
+      const actualTime = convertDateTime(time);
       const { lat, lng } = convertLatLngToCoords(center);
       const sunTimes = calculateSunTimes(lat, lng, date);
 

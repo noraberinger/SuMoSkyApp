@@ -2,6 +2,7 @@
 precision highp float;
 
 in vec2 vTexCoord;
+
 out vec4 fragColor;
 
 uniform sampler2D uTextureSun;   
@@ -16,8 +17,8 @@ void main() {
     }
 
     //Texture sampling:
-    vec4 colorSun = texture(uTextureSun, vTexCoord);   
-
+    vec4 colorSun = texture(uTextureSun, vTexCoord);  
+    
     fragColor = colorSun;
 
 }

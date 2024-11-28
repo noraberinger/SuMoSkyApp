@@ -1,14 +1,13 @@
 #version 300 es
-precision highp float;
+precision highp float; 
 
 in vec3 position;
-in vec2 texcoord;  
+out vec4 vColor;
 
+uniform vec4 uColor;
 uniform mat4 uMVP;
-
-out vec2 vTexCoord;
 
 void main() {
     gl_Position = uMVP * vec4(position, 1.0);
-    vTexCoord = texcoord;
+    vColor = uColor;
 }
