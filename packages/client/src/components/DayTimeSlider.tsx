@@ -41,13 +41,23 @@ function valueText(value: number) {
  * * https://mui.com/material-ui/react-slider/
  */
 const DayTimeSlider: React.FC<TimeSliderProps> = ({ value, onChange }) => {
+  const handleSliderChange = (e: Event, newValue: number | number[]) => {
+    const newTime = newValue as number;
+
+    if (newTime === 144) {
+      onChange(0);
+    } else {
+      onChange(newTime);
+    }
+  };
+
   return (
     <div style={{ marginTop: "2em", padding: "0 1.75em" }}>
       <Slider
         size="small"
         track={false}
         value={value}
-        onChange={(e, newValue) => onChange(newValue as number)}
+        onChange={handleSliderChange}
         marks={timeMarks}
         min={0}
         max={144}
@@ -61,6 +71,10 @@ const DayTimeSlider: React.FC<TimeSliderProps> = ({ value, onChange }) => {
           },
           "& .MuiSlider-markLabel": {
             color: "white",
+          },
+          "& .MuiSlider-valueLabel": {
+            zIndex: 700,
+            position: "relative",
           },
         })}
       />

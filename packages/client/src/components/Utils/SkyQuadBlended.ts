@@ -23,12 +23,7 @@ class SkyQuadBlended {
   private lightningPhase: number;
   private dayPhase: number;
 
-  constructor(
-    gl: WebGL2RenderingContext | WebGLRenderingContext,
-    date: Date,
-    time: number,
-    center: L.LatLngExpression | undefined,
-  ) {
+  constructor(gl: WebGL2RenderingContext | WebGLRenderingContext) {
     this.gl = gl;
     this.textures = {
       dayTexture: null,
@@ -46,7 +41,6 @@ class SkyQuadBlended {
     this.clamp(0, 0, 0);
     this.lightningPhase = 0;
     this.dayPhase = 0;
-    this.syncDateTime(date, time, center);
   }
 
   /** Create a simple Quad */
@@ -93,7 +87,7 @@ class SkyQuadBlended {
     center: L.LatLngExpression | undefined,
   ): void {
     if (center) {
-      const actualTime = convertDateTime(time);
+      const actualTime = convertDateTime(date, time);
       const { lat, lng } = convertLatLngToCoords(center);
       const sunTimes = calculateSunTimes(lat, lng, date);
 

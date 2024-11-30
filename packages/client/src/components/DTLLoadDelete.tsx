@@ -32,7 +32,6 @@ import {
 } from "./Utils/ColorThemes";
 
 interface DTLLoadDeleteProps {
-  isDTLVisible: boolean;
   setCenter: React.Dispatch<React.SetStateAction<LatLngExpression | undefined>>;
   setSelectedDate: React.Dispatch<React.SetStateAction<Date>>;
   setSliderTime: React.Dispatch<React.SetStateAction<number>>;
@@ -52,7 +51,6 @@ export type Plan = {
  * Functionality buttons to delete a plan and to move to a saved plan.
  */
 const DTLLoadDelete: React.FC<DTLLoadDeleteProps> = ({
-  isDTLVisible,
   setCenter,
   setSelectedDate,
   setSliderTime,
@@ -140,23 +138,11 @@ const DTLLoadDelete: React.FC<DTLLoadDeleteProps> = ({
           aria-label="showPlans"
           onClick={toggleTable}
           size="small"
-          style={{
-            position: "absolute",
-            top: isDTLVisible ? "9.375em" : "2.9em",
-            left: "4em",
-            zIndex: "2000",
-          }}
         >
           <Bookmark />
         </Fab>
       </ThemeProvider>
-      <Dialog
-        open={tableIsOpen}
-        onClose={toggleTable}
-        fullWidth
-        maxWidth="md"
-        style={{ zIndex: 2000 }}
-      >
+      <Dialog open={tableIsOpen} onClose={toggleTable} fullWidth maxWidth="md">
         <DialogTitle>
           Saved Plans
           <IconButton

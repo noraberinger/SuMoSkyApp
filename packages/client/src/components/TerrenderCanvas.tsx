@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import { useRef, useEffect, useState, useMemo } from "react";
 import { Terrender, StandardInputHandler } from "terrender-core";
 import Button from "@mui/material/Button";
-import L, { latLng } from "leaflet";
+import L from "leaflet";
 import SkyQuadBlended from "./Utils/SkyQuadBlended";
 import { convertDateTime, convertLatLngToCoords } from "./Utils/Calc";
 import { ThemeProvider } from "@mui/material";
@@ -105,13 +105,8 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   /** References for WebGL Objects, drawn using function drawSky */
   const skyquadRef = useRef<SkyQuadBlended | null>(null);
   const celestialBodiesRef = useRef<CelestialBodies | null>(null);
-  const dateRef = useRef<Date>(date);
-  const timeRef = useRef<number>(time);
-  const centerRef = useRef<L.LatLngExpression | undefined>(center);
   /** Compass direction */
   const [currentDirection, setCurrentDirection] = useState<number>(0);
-  const [lastPathKey, setLastPathKey] = useState<string | null>(null);
-  const [lastPositionKey, setLastPositionKey] = useState<string | null>(null);
 
   /** Memo calculations for date, time, lat, lng */
   const latLngToCoordsMemo = useMemo(() => {
@@ -122,25 +117,49 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     return { lat: 0, lng: 0 };
   }, [center]);
 
-  const timeMemo = useMemo(() => {
-    if (time) {
-      const currentDate = convertDateTime(time);
+  const dateTimeMemo = useMemo(() => {
+    if (date && time) {
+      const currentDate = convertDateTime(date, time);
       return currentDate;
     }
     //return default now if no time provided
     return new Date();
-  }, [time]);
+  }, [date, time]);
 
   //Helper function setting setShouldRedrawCallback in Terrender
-  const setCallbacks = () => {
+  const forceRender = useCallback(() => {
     if (terrenderRef.current) {
+      // setShouldRedrawCallback is evaluated in Terrender's renderLoop. if true, it forces a render
       terrenderRef.current.setShouldRedrawCallback(() => true);
-      terrenderRef.current.setRenderLoopCallback(
-        (didDraw: boolean) =>
-          didDraw && terrenderRef.current?.setShouldRedrawCallback(() => false),
-      );
+      // setRenderLoopCallback is called after renderLoop, with didDraw indicating if Terrender actually rendered something
+      // we'll use it to disable redraw callback again, to avoid terrender rendering in circles
+      terrenderRef.current.setRenderLoopCallback((didDraw: boolean) => {
+        if (didDraw) terrenderRef.current?.setShouldRedrawCallback(() => false);
+        /** Check if tile data is loaded */
+        if (!didInitialDraw) {
+          const rootTilesReady = !terrenderRef.current
+            ?.getLoadingState()
+            .isLoading();
+          if (rootTilesReady && terrenderRef.current) setDidInitialDraw(true);
+        }
+      });
+      // make Terrender call renderloop
+      terrenderRef.current.requestRender();
     }
-  };
+  }, [didInitialDraw]);
+
+  //TODO: supervisor referenced index.js to use setDrawCallback and not requestAnimationFrame => major calls to this function chelp...
+  // let skyCall = 0;
+  /** Draw all elements except terrender => terrender will be drawn after setPreDrawCallback => drawCustom(drawSky) */
+  const drawSky = useCallback((didDraw: boolean) => {
+    // skyCall++;
+    ///  console.error("skycall", skyCall);
+    if (didDraw && skyquadRef.current && celestialBodiesRef.current) {
+      skyquadRef.current.render();
+      celestialBodiesRef.current.renderPath();
+      celestialBodiesRef.current.renderPosition();
+    }
+  }, []);
 
   //Set up canvas
   useEffect(() => {
@@ -162,18 +181,14 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     }
 
     try {
+      //debugger;
       /** Initialize Canvas objects and input handler */
       terrenderRef.current = new CustomTerrender(
         gl,
         config,
         config.initialCamera as object,
       );
-      skyquadRef.current = new SkyQuadBlended(
-        gl,
-        dateRef.current,
-        timeRef.current,
-        centerRef.current,
-      );
+      skyquadRef.current = new SkyQuadBlended(gl);
       celestialBodiesRef.current = new CelestialBodies(gl);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
@@ -216,113 +231,49 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         celestialBodiesRef.current = null;
       }
     };
-  }, [config]);
-
-  let skyCall = 0;
-  /** Draw all elements except terrender => terrender will be drawn after setPreDrawCallback => drawCustom(drawSky) */
-  const drawSky = useCallback(
-    (didDraw: boolean) => {
-      skyCall++;
-      console.log("skycall", skyCall);
-      if (
-        didDraw &&
-        skyquadRef.current &&
-        celestialBodiesRef.current &&
-        dateRef.current
-      ) {
-        skyquadRef.current.render();
-      }
-    },
-    [skyCall],
-  );
+  }, [config, drawSky]);
 
   /** Sync skyQuad values */
   useEffect(() => {
     if (skyquadRef.current && terrenderRef.current) {
       if (center as L.LatLngExpression) {
         skyquadRef.current.syncDateTime(date, time, center);
-        setCallbacks();
-        terrenderRef.current.requestRender();
+        forceRender();
       }
     } else {
       console.warn(
         "useEffect failed as skyQuadRef.current || terrenderRef.current is null.",
       );
     }
-  }, [center, date, time]);
+  }, [center, date, forceRender, time]);
 
-  //Helper function to generate a key for current loaction and date, passed to pathCache in CelestialBodies.ts
-  const generatePositionKey = (
-    lat: number,
-    lng: number,
-    currentDate: Date,
-    timeMemo: Date,
-  ) => {
-    const day = String(currentDate.getDate()).padStart(2, "0");
-    const month = String(currentDate.getMonth() + 1).padStart(2, "0");
-    const year = String(currentDate.getFullYear());
-    const hour = String(timeMemo.getHours()).padStart(2, "0");
-    const minute = String(timeMemo.getMinutes()).padStart(2, "0");
-    const key = `${lat}-${lng}-${year}-${month}-${day}-${hour}-${minute}`;
-    return key;
-  };
-
-  const generatePathKey = (lat: number, lng: number, currentDate: Date) => {
-    const day = String(currentDate.getDate()).padStart(2, "0");
-    const month = String(currentDate.getMonth() + 1).padStart(2, "0");
-    const year = String(currentDate.getFullYear());
-    const key = `${lat}-${lng}-${year}-${month}-${day}`;
-    return key;
-  };
-
-  let useEffectCall = 0;
   //Sync celestialBodies when lat, lng, time or date changes
   useEffect(() => {
-    useEffectCall++;
-    console.log("useEffect for path:", useEffectCall);
-
-    const positionKey = generatePositionKey(
-      latLngToCoordsMemo.lat,
-      latLngToCoordsMemo.lng,
-      new Date(date),
-      timeMemo,
-    );
-    const pathKey = generatePathKey(
-      latLngToCoordsMemo.lat,
-      latLngToCoordsMemo.lng,
-      new Date(date),
-    );
-
-    if (celestialBodiesRef.current) {
-      requestAnimationFrame(() => {
-        celestialBodiesRef.current?.updatePath(
-          latLngToCoordsMemo.lat,
-          latLngToCoordsMemo.lng,
-          new Date(date),
-          pathKey,
-        );
-        celestialBodiesRef.current?.updatePosition(
-          latLngToCoordsMemo.lat,
-          latLngToCoordsMemo.lng,
-          timeMemo,
-          positionKey,
-        );
-      });
+    if (celestialBodiesRef.current && terrenderRef.current) {
+      celestialBodiesRef.current.updatePath(
+        latLngToCoordsMemo.lat,
+        latLngToCoordsMemo.lng,
+        date,
+      );
+      forceRender();
     }
+  }, [date, forceRender, latLngToCoordsMemo.lat, latLngToCoordsMemo.lng]);
 
-    setLastPositionKey(positionKey);
-    setLastPathKey(pathKey);
-
-    setCallbacks();
-    terrenderRef.current?.requestRender();
+  useEffect(() => {
+    if (celestialBodiesRef.current && terrenderRef.current) {
+      celestialBodiesRef.current.updatePosition(
+        latLngToCoordsMemo.lat,
+        latLngToCoordsMemo.lng,
+        dateTimeMemo,
+      );
+      forceRender();
+    }
   }, [
     date,
+    forceRender,
     latLngToCoordsMemo.lat,
     latLngToCoordsMemo.lng,
-    timeMemo,
-    useEffectCall,
-    lastPositionKey,
-    lastPathKey,
+    dateTimeMemo,
   ]);
 
   /** Calculates newPos and newTarget in order to move on terrain to a specified location.
@@ -373,61 +324,45 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   );
 
   const moveToLocation = useCallback(
-    (latLng: L.LatLngExpression, additionalElevation: number) => {
+    (latLng: L.LatLngExpression) => {
+      console.log("moveToLocation latLng", latLng);
       /** If center changes while Camera is not in topDown => getCamera().target is [0, 0, 1]  */
-      const amplification = 4;
-      if (terrenderRef.current) {
-        const { newPos, zCoord } = getTerrainPosition(latLng);
-        const zCoordAdjusted =
-          additionalElevation *
-          terrenderRef.current.getParameters().heightScaling *
-          amplification;
-        const newZ = zCoord + zCoordAdjusted;
+      if (terrenderRef.current && !topDownConfigs) {
+        // setSliderElevation(Math.round(newZ));
+        const { newPos } = getTerrainPosition(latLng);
+        const newTarget = terrenderRef.current.getCamera().target;
+        newTarget[0] = newPos[0];
+        terrenderRef.current.getCamera().changeCamPosition(newPos, newTarget);
+        setCurrentDirection(0);
+      } else if (terrenderRef.current && topDownConfigs) {
+        /** If center changes while Camera is in topDown => getCamera().target is [0, 1, 0]*/
+        // setSliderElevation(Math.round(newZ));
+        const { zCoord, newPos } = getTerrainPosition(latLng);
+        const initialUp = topDownConfigs.initialUp;
+        const position = newPos;
+        const posZCoord = zCoord;
+        const target = topDownConfigs.target;
+        const targetXCoord = target[0];
+        const targetYCoord = target[1];
+        setTopDownConfigs({
+          initialUp,
+          position,
+          posZCoord,
+          target,
+          targetXCoord,
+          targetYCoord,
+        });
+        setToggledTopDown(true);
 
-        if (!topDownConfigs) {
-          setSliderElevation(Math.round(newZ));
-          const newPosition = [newPos[0], newPos[1], newZ];
-          const newTarget = terrenderRef.current.getCamera().target;
-          newTarget[0] = newPosition[0];
-          //Make camera look south
-          //newTarget[1] = newPosition[1] - 1;
-          newTarget[1] = newPosition[1];
-          terrenderRef.current
-            .getCamera()
-            .changeCamPosition(newPosition, newTarget);
-          setCurrentDirection(0);
-        } else if (topDownConfigs) {
-          /** If center changes while Camera is in topDown => getCamera().target is [0, 1, 0]*/
-          setSliderElevation(Math.round(newZ));
-          const initialUp = topDownConfigs.initialUp;
-          const position = newPos;
-          const posZCoord = zCoord;
-          const target = topDownConfigs.target;
-          const targetXCoord = target[0];
-          const targetYCoord = target[1];
-          setTopDownConfigs({
-            initialUp,
-            position,
-            posZCoord,
-            target,
-            targetXCoord,
-            targetYCoord,
-          });
-          setToggledTopDown(true);
-
-          target[0] = position[0];
-          position[2] = topDownCamZCoord + additionalElevation;
-          //Make camera look south => position[1]-1, for north position[1]
-          const newTarget = [position[0], position[1], 0];
-          terrenderRef.current.getCamera().initialUp = [0, 1, 0];
-          terrenderRef.current
-            .getCamera()
-            .changeCamPosition(position, newTarget);
-          setCurrentDirection(0);
-        }
+        target[0] = position[0];
+        position[2] = topDownCamZCoord;
+        const newTarget = [position[0], position[1], 0];
+        terrenderRef.current.getCamera().initialUp = [0, 1, 0];
+        terrenderRef.current.getCamera().changeCamPosition(position, newTarget);
+        setCurrentDirection(0);
       }
     },
-    [getTerrainPosition, setToggledTopDown, topDownConfigs, setSliderElevation],
+    [getTerrainPosition, setToggledTopDown, topDownConfigs],
   );
 
   //TODO log what is happening
@@ -448,10 +383,11 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
    */
   //TODO: When loading setSliderElevation === 0, one initialization slider at 0 or set to actual elevation of position which is the elevation relative to terrain data. e.g. 0.507 for Zurich => slider set to 507m?
   useEffect(() => {
+    console.log("didInitialDraw", didInitialDraw);
     if (center && didInitialDraw) {
-      moveToLocation(center, elevation);
+      moveToLocation(center);
     }
-  }, [center, didInitialDraw, elevation, moveToLocation]);
+  }, [center, didInitialDraw, moveToLocation]);
 
   //TODO: visibility make sure terrain not just disappears
   useEffect(() => {

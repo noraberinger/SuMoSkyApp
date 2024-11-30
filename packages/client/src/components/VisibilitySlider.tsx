@@ -1,14 +1,15 @@
 //Data provided by Open-Meteo, licensed under CC-BY 4.0
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import Slider from "@mui/material/Slider";
+import { Slider, Snackbar, Typography } from "@mui/material";
 import { fetchWeatherApi } from "openmeteo";
 import { LatLngExpression } from "leaflet";
-import { convertLatLngToCoords } from "./Utils/Calc";
+import { convertLatLngToCoords, handleSnackbarClose } from "./Utils/Calc";
 
 interface VisibilitySliderProps {
   value: number;
   onChange: (value: number) => void;
   center: LatLngExpression | undefined;
+  selectedDate: Date;
 }
 
 /** Generating the marking of the slider which depict elevation above sea level in m up to 10000m */
@@ -40,13 +41,17 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   value,
   onChange,
   center,
+  selectedDate,
 }) => {
   const [forecastVisibility, setForecastVisibility] =
     useState<Float32Array | null>(null);
   const url = "https://api.open-meteo.com/v1/forecast";
   const fetchAttempted = useRef(false);
+  const [openSnackbarForecast, setOpenSnackbarForecast] = useState(false);
+  const snackbarStates = { openSnackbarForecast };
+  const setSnackbarStates = { openSnackbarForecast: setOpenSnackbarForecast };
+  const initialRender = useRef(true);
 
-  //TODO add day checker => if day/hour changes should refetch data
   const fetchVisbilityData = useCallback(async (lat: number, lng: number) => {
     if (fetchAttempted.current) return;
     fetchAttempted.current = true;
@@ -71,11 +76,56 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
     }
   }, []);
 
+  const triggerSnackbarClose = () => {
+    handleSnackbarClose(snackbarStates, setSnackbarStates);
+  };
+
   useEffect(() => {
     if (center && !fetchAttempted.current) {
       const { lat, lng } = convertLatLngToCoords(center);
       fetchVisbilityData(lat, lng);
     }
+  }, [center, fetchVisbilityData]);
+
+  /** Refetch data when calendar date is changed */
+  useEffect(() => {
+    if (initialRender.current) {
+      initialRender.current = false;
+      return;
+    }
+
+    if (selectedDate) {
+      const currentDate = new Date();
+      //Difference between currentDate and selectedDate in ms
+      const differenceDays = Math.floor(
+        (selectedDate.getTime() - currentDate.getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      if (differenceDays >= 0 && differenceDays <= 7 && center) {
+        fetchAttempted.current = false;
+        const { lat, lng } = convertLatLngToCoords(center);
+        fetchVisbilityData(lat, lng);
+        console.log("refetch of date");
+      } else {
+        setOpenSnackbarForecast(true);
+      }
+    }
+  }, [selectedDate, center, fetchVisbilityData]);
+
+  /** Refetch data every hour */
+  useEffect(() => {
+    const intervalId = setInterval(
+      () => {
+        if (center) {
+          fetchAttempted.current = false;
+          const { lat, lng } = convertLatLngToCoords(center);
+          fetchVisbilityData(lat, lng);
+        }
+      },
+      60 * 60 * 1000,
+    );
+
+    return () => clearInterval(intervalId);
   }, [center, fetchVisbilityData]);
 
   return (
@@ -106,6 +156,19 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
           Current Visibility: {forecastVisibility[0]} m
         </div>
       )}
+      <Snackbar
+        open={openSnackbarForecast}
+        message={
+          <Typography
+            dangerouslySetInnerHTML={{
+              __html:
+                "Forecast available for 7 days only. For your selected date no forecast data available.",
+            }}
+          />
+        }
+        autoHideDuration={6000}
+        onClose={triggerSnackbarClose}
+      />
     </div>
   );
 };

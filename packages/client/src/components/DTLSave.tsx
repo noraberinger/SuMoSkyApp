@@ -12,10 +12,6 @@ interface StorageHandlerProps {
   setSavedPlans: React.Dispatch<React.SetStateAction<Plan[]>>;
 }
 
-interface DTLSaveButtonProps extends StorageHandlerProps {
-  isDTLVisible: boolean;
-}
-
 const localStorageHandler = ({
   center,
   date,
@@ -74,11 +70,10 @@ const localStorageHandler = ({
  * @returns Button to save specific DTL
  * Current DTL data will be stored in localstorage.
  */
-const DTLSave: React.FC<DTLSaveButtonProps> = ({
+const DTLSave: React.FC<StorageHandlerProps> = ({
   center,
   date,
   time,
-  isDTLVisible,
   setSavedPlans,
 }) => {
   const [openSnackbarDTL, setOpenSnackbarDTL] = useState(false);
@@ -105,12 +100,6 @@ const DTLSave: React.FC<DTLSaveButtonProps> = ({
             handleSaveDTL();
           }}
           size="small"
-          style={{
-            position: "absolute",
-            top: isDTLVisible ? "9.375em" : "2.9em",
-            left: "1em",
-            zIndex: "1000",
-          }}
         >
           <BookmarkAdd />
         </Fab>

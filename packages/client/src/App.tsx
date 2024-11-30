@@ -8,13 +8,14 @@ import {
   ButtonGroup,
   Button,
   ThemeProvider,
+  Tooltip,
 } from "@mui/material";
 import TerrenderCanvas from "./components/TerrenderCanvas";
 import LeafletMap, { positionZurich, Marker } from "./components/LeafletMap";
 import DayTimeSlider from "./components/DayTimeSlider";
 import Calendar from "./components/Calendar";
 import SearchField from "./components/SearchField";
-import SunMoonPositionCalc from "./components/CelestialBodiesLeaflet";
+import CelestialBodiesLeaflet from "./components/CelestialBodiesLeaflet";
 import ElevationSlider from "./components/ElevationSlider";
 import VisibilitySlider from "./components/VisibilitySlider";
 import {
@@ -26,6 +27,7 @@ import DTLSave from "./components/DTLSave";
 import DTLLoadDelete, { Plan } from "./components/DTLLoadDelete";
 import PhotoFeatures from "./components/PhotoFeatures";
 import { infoTheme } from "./components/Utils/ColorThemes";
+import { tooltipTheme } from "./components/Utils/TooltipTheme";
 
 interface ClientConfig {
   tileSideLength?: number;
@@ -117,7 +119,7 @@ const App: React.FC = () => {
 
   /** Elevation slider */
   //TODO connect with actual height of TerrenderCanvas => take that as initial elevation
-  const initialElevationSlider = 0;
+  const initialElevationSlider = 1;
   const [sliderElevation, setSliderElevation] = useState<number>(
     initialElevationSlider,
   );
@@ -173,6 +175,32 @@ const App: React.FC = () => {
 
   return (
     <>
+      <div
+        style={{
+          position: "absolute",
+          top: "0.25em",
+          right: "0.625em",
+          zIndex: 600,
+        }}
+      >
+        <ThemeProvider theme={tooltipTheme}>
+          <Tooltip
+            title={
+              <>
+                Toggle Location Search,
+                <br /> Calendar and Time visibility
+              </>
+            }
+            arrow
+          >
+            <Switch
+              checked={isDTLVisible}
+              onChange={handleToggle}
+              size="medium"
+            />
+          </Tooltip>
+        </ThemeProvider>
+      </div>
       {/* UI DTL */}
       {isDTLVisible && (
         <Grid
@@ -184,7 +212,7 @@ const App: React.FC = () => {
             position: "absolute",
             top: "0em",
             left: "0em",
-            zIndex: 1600,
+            zIndex: 500,
             backgroundColor: "rgba(60,60,60,0.6)",
             borderBottom: "2px solid rgb(30,30,30)",
           }}
@@ -209,7 +237,7 @@ const App: React.FC = () => {
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
-              zIndex: 1600,
+              zIndex: 500,
             }}
             size={{ xs: 12, md: 3 }}
           >
@@ -230,133 +258,114 @@ const App: React.FC = () => {
           flexDirection: "column-reverse",
           justifyContent: "center",
         }}
-      >
-        <Switch checked={isDTLVisible} onChange={handleToggle} size="medium" />
-      </Grid>
+      ></Grid>
       {/* Map container */}
       <Grid spacing={1} container height={"100%"}>
-        {/* Leaflet */}
-        <Grid size={{ xs: 12, md: 6 }} sx={{ overflow: "hidden" }}>
+        <Grid
+          container
+          size={{ xs: 12, md: 6 }}
+          sx={{ overflow: "hidden", position: "relative" }}
+        >
+          {/* Leaflet Map */}
           <LeafletMap
             mapRef={mapRef}
             center={center}
             markers={markers}
             setMarkers={setMarkers}
             setCenter={setCenter}
-            isDTLVisible={isDTLVisible}
           />
-          {/*<Sampler
-            elevation={elevation}
+          {/* Sun/Moon Position on Leaflet Map */}
+          <CelestialBodiesLeaflet
+            mapRef={mapRef}
             center={center}
-            setMarkers={setMarkers}
-          />*/}
-          {/* Save/Load/Delete DTL Plan */}
-          <Grid
-            id="DTL"
-            sx={{
-              marginTop: "2em",
-              padding: "0 1.75em",
-              marginBottom: "2em",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 1200,
-            }}
-          >
-            <DTLSave
-              center={center}
-              date={selectedDate}
-              time={sliderTime}
-              isDTLVisible={isDTLVisible}
-              setSavedPlans={setSavedPlans}
-            />
-            <DTLLoadDelete
-              isDTLVisible={isDTLVisible}
-              setCenter={setCenter}
-              setSelectedDate={setSelectedDate}
-              setSliderTime={setSliderTime}
-              savedPlans={savedPlans}
-              setSavedPlans={setSavedPlans}
-            />
-          </Grid>
-          {/* Sun/Moon Position */}
-          <Grid
-            id="sunMoonPositionCalc"
-            style={{ position: "absolute", zIndex: 1500 }}
-          >
-            <SunMoonPositionCalc
-              mapRef={mapRef}
-              center={center}
-              date={selectedDate}
-              time={sliderTime}
-              showSun={showSun}
-              showMoon={showMoon}
-              setSunTimes={setSunTimes}
-              setMoonTimes={setMoonTimes}
-              setMoonPhase={setMoonPhase}
-              setIsSupermoon={setIsSupermoon}
-            />
-          </Grid>
-          {/* Show/Hide Sun/Moon */}
-          <Grid
-            id="Sun/Moon Buttongroup"
-            sx={{
-              marginTop: "2em",
-              padding: "0 1em 0.05em 1em",
-              marginBottom: "2em",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              zIndex: 1500,
-            }}
-          >
-            <ThemeProvider theme={infoTheme}>
-              <ButtonGroup
-                orientation="vertical"
-                aria-label="SunAndMoonControls"
-                variant="contained"
-                size="small"
-                color="info"
-                style={{
-                  position: "absolute",
-                  top: isDTLVisible ? "5.65em" : "0.3em",
-                  zIndex: "1500",
-                }}
-              >
-                <Button onClick={() => setShowSun(!showSun)}>
-                  {showSun ? "Hide " : "Show "}
-                  <SunIcon />
-                </Button>
-                <Button onClick={() => setShowMoon(!showMoon)}>
-                  {showMoon ? "Hide " : "Show "}
-                  <MoonIcon />
-                </Button>
-              </ButtonGroup>
-            </ThemeProvider>
-          </Grid>
-          {/* PhotoFeatures */}
-          <Grid
-            id="PhotoFeatures"
-            sx={{
-              marginTop: "2em",
-              padding: "0 1em 0.05em 1em",
-              marginBottom: "2em",
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "flex-end",
+            date={selectedDate}
+            time={sliderTime}
+            showSun={showSun}
+            showMoon={showMoon}
+            setSunTimes={setSunTimes}
+            setMoonTimes={setMoonTimes}
+            setMoonPhase={setMoonPhase}
+            setIsSupermoon={setIsSupermoon}
+          />
+          <div
+            style={{
               width: "100%",
               height: "100%",
-              zIndex: 1500,
+              zIndex: 400,
+              position: "absolute",
             }}
           >
-            <PhotoFeatures
-              isDTLVisible={isDTLVisible}
-              sunTimes={sunTimes}
-              moonTimes={moonTimes}
-              isSupermoon={isSupermoon}
-              moonPhase={moonPhase}
-            />
-          </Grid>
+            <Grid container>
+              {/* Spacer when DTL UI visible */}
+              <Grid
+                size={{ xs: 12 }}
+                sx={{ height: isDTLVisible ? "6em" : "0.75em" }}
+              />
+              {/* Save/Load/Delete DTL Plan */}
+              <Grid
+                size={{ xs: 3 }}
+                sx={{
+                  display: "flex",
+                  flexDirection: "row",
+                  paddingLeft: "1em",
+                  gap: "0.5em",
+                }}
+              >
+                <DTLSave
+                  center={center}
+                  date={selectedDate}
+                  time={sliderTime}
+                  setSavedPlans={setSavedPlans}
+                />
+                <DTLLoadDelete
+                  setCenter={setCenter}
+                  setSelectedDate={setSelectedDate}
+                  setSliderTime={setSliderTime}
+                  savedPlans={savedPlans}
+                  setSavedPlans={setSavedPlans}
+                />
+              </Grid>
+              <Grid size={{ xs: 6 }} />
+              <Grid
+                id="PhotoFeatures"
+                sx={{
+                  paddingRight: "1em",
+                  display: "flex",
+                  alignItems: "end",
+                  flexDirection: "column",
+                }}
+                size={{ xs: 3 }}
+              >
+                {/* Show/Hide Sun/Moon */}
+                <ThemeProvider theme={infoTheme}>
+                  <ButtonGroup
+                    orientation="vertical"
+                    aria-label="SunAndMoonControls"
+                    variant="contained"
+                    size="small"
+                    color="info"
+                    sx={{ width: "50%" }}
+                  >
+                    <Button onClick={() => setShowSun(!showSun)}>
+                      {showSun ? "Hide " : "Show "}
+                      <SunIcon />
+                    </Button>
+                    <Button onClick={() => setShowMoon(!showMoon)}>
+                      {showMoon ? "Hide " : "Show "}
+                      <MoonIcon />
+                    </Button>
+                  </ButtonGroup>
+                </ThemeProvider>
+                {/* PhotoFeatures */}
+                <PhotoFeatures
+                  sunTimes={sunTimes}
+                  moonTimes={moonTimes}
+                  isSupermoon={isSupermoon}
+                  moonPhase={moonPhase}
+                />
+              </Grid>
+            </Grid>
+          </div>
         </Grid>
         {/* TerrenderCanvas */}
         <Grid
@@ -438,6 +447,7 @@ const App: React.FC = () => {
               value={sliderVisibility}
               onChange={setSliderVisibility}
               center={center}
+              selectedDate={selectedDate}
             />
           )}
         </Grid>

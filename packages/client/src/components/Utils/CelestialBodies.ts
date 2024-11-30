@@ -10,6 +10,9 @@ interface Vertex {
   azimuth: number;
 }
 
+const pathCacheSize = 30; //in total allowing 30 center and/or date changes => should be enough if user has fixed landmark and date in mind
+const positionCacheSize = pathCacheSize * (144 * 0.5); //144 as each day has 24 * 6 10min intervals => slider steps in 10min steps
+
 class CelestialBodies {
   private gl: WebGL2RenderingContext | WebGLRenderingContext;
   private shaderProgramInfo: twgl.ProgramInfo | null;
@@ -33,6 +36,8 @@ class CelestialBodies {
       moon: [number, number, boolean];
     }
   >();
+  private currentPathKey?: string;
+  private currentPositionKey?: string;
 
   constructor(gl: WebGL2RenderingContext | WebGLRenderingContext) {
     this.gl = gl;
@@ -221,6 +226,7 @@ class CelestialBodies {
       }
     }
 
+    //TODO: maybe remove => if date is fixed don't need it
     //Calculate paths for previous (-1) and next day (+1)
     [-1, 1].forEach((dayOffset) => {
       const offsetDate = new Date(date);
@@ -368,41 +374,16 @@ class CelestialBodies {
       this.gl.drawArrays(mode, 0, vertexAmount);
     }
 
-    /** 
-    //Get set up pointer to x,y values => x,y define screen position
-    this.gl.vertexAttribPointer(
-      this.positionLocation,
-      2,
-      this.gl.FLOAT,
-      false,
-      12,
-      0,
-    );
-    this.gl.uniform2fv(this.scaleLocation, scale);
-    this.gl.uniform2fv(this.translationLocation, translation);
-    this.gl.uniform3fv(this.colorLocation, color);
-
-     Since path has (x,y,z) values find out how many vertices are in vertex array
-     * => array divisible by 3 (as x,y,z) will give amount individual vertices
-     
-    const vertexAmount = vertices
-      ? vertices.length / 3
-      : this.gl.getBufferParameter(this.gl.ARRAY_BUFFER, this.gl.BUFFER_SIZE) /
-        8;
-
-    this.gl.drawArrays(mode, 0, vertexAmount);
-    */
-
     this.gl.disable(this.gl.BLEND);
   }
 
+  /** Cache drawing for Positions */
   private drawPositionFromCache(data: {
     sun: [number, number, boolean];
     moon: [number, number, boolean];
   }) {
     const { sun, moon } = data;
 
-    //Draw Sun and Moon position
     if (this.circleBuffer) {
       this.drawObject(
         this.circleBuffer,
@@ -426,7 +407,7 @@ class CelestialBodies {
     }
   }
 
-  //When data for path already in cache draw it
+  /** Cache drawing for Paths */
   private drawPathsFromCache(data: {
     sunPath: Float32Array;
     moonPath: Float32Array;
@@ -453,118 +434,138 @@ class CelestialBodies {
     }
   }
 
-  //Update Sun/Moon Position when time, lat, lng changes
-  public updatePosition(
-    lat: number,
-    lng: number,
-    currentDate: Date,
-    key: string,
-  ) {
+  /** Helper functions to generate cache keys => 2 different key as position needs more info in key than path does */
+  private generatePositionKey = (lat: number, lng: number, dateTime: Date) => {
+    const day = String(dateTime.getDate()).padStart(2, "0");
+    const month = String(dateTime.getMonth() + 1).padStart(2, "0");
+    const year = String(dateTime.getFullYear());
+    const hour = String(dateTime.getHours()).padStart(2, "0");
+    const minute = String(dateTime.getMinutes()).padStart(2, "0");
+    const key = `${lat}-${lng}-${year}-${month}-${day}-${hour}-${minute}`;
+    return key;
+  };
+
+  private generatePathKey = (lat: number, lng: number, date: Date) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = String(date.getFullYear());
+    const key = `${lat}-${lng}-${year}-${month}-${day}`;
+    return key;
+  };
+
+  /** Update Sun/Moon Position when lat, lng, dateTime changes => inputs over search field, calendar and time slider */
+  public updatePosition(lat: number, lng: number, dateTime: Date) {
     const start = performance.now();
-    console.log("key", key);
-
-    //Check chache for position data and draw it directly if it exists, else calculate the position and add it to cache
-    if (this.positionCache.has(key)) {
-      const cachedData = this.positionCache.get(key);
-      if (cachedData) {
-        this.drawPositionFromCache(cachedData);
-        console.log("Position data loaded from cache", key);
-        return;
-      }
-    } else if (!this.positionCache.has(key)) {
-      console.log("Key not in cache. Recalculating position for key.", key);
-    }
-
-    //TODO refine cache max size
-    //Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
-    if (this.positionCache.size > 100) {
-      this.positionCache.clear();
-    }
-
     this.updatePositionCount++;
     console.log("updatePositionCount", this.updatePositionCount);
 
-    const now = new Date(currentDate);
-    const observer = new Astronomy.Observer(lat, lng, 0);
+    /**Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
+     * Keeping lastKey and restoring it after cache is cleared in order to minimize unnecessary recalculations
+     */
+    if (this.positionCache.size > positionCacheSize) {
+      const lastKey = this.currentPositionKey;
+      if (lastKey) {
+        const cachedData = this.positionCache.get(lastKey);
+        console.log("Clearing position cache...");
+        this.positionCache.clear();
+        if (cachedData) this.positionCache.set(lastKey, cachedData);
+      }
+    }
 
-    // Get current Sun and Moon position
-    const [sunX, sunY, sunAboveHorizon] = this.calculatePosition(
-      Astronomy.Body.Sun,
-      observer,
-      now,
-    );
-    const [moonX, moonY, moonAboveHorizon] = this.calculatePosition(
-      Astronomy.Body.Moon,
-      observer,
-      now,
-    );
-    this.positionCache.set(key, {
-      sun: [sunX, sunY, sunAboveHorizon],
-      moon: [moonX, moonY, moonAboveHorizon],
-    });
-    this.drawPositionFromCache({
-      sun: [sunX, sunY, sunAboveHorizon],
-      moon: [moonX, moonY, moonAboveHorizon],
-    });
+    const key = this.generatePositionKey(lat, lng, dateTime);
+    console.log("key", key);
+
+    // Calculate if key not in cache
+    if (!this.positionCache.has(key)) {
+      const observer = new Astronomy.Observer(lat, lng, 0);
+
+      // Get current Sun and Moon position
+      const [sunX, sunY, sunAboveHorizon] = this.calculatePosition(
+        Astronomy.Body.Sun,
+        observer,
+        dateTime,
+      );
+      const [moonX, moonY, moonAboveHorizon] = this.calculatePosition(
+        Astronomy.Body.Moon,
+        observer,
+        dateTime,
+      );
+      //Add position data to cache
+      this.positionCache.set(key, {
+        sun: [sunX, sunY, sunAboveHorizon],
+        moon: [moonX, moonY, moonAboveHorizon],
+      });
+    }
+
+    this.currentPositionKey = key;
 
     const end = performance.now();
     console.log(`Execution time updatePosition: ${(end - start).toFixed(2)}ms`);
   }
 
-  //Update Path when date, lat, lng changes
-  public updatePath(lat: number, lng: number, currentDate: Date, key: string) {
+  /** Update Sun/Moon Path when lat, lng, date changes => inputs over search field and calendar */
+  public updatePath(lat: number, lng: number, date: Date) {
     const start = performance.now();
-    console.log("key", key);
-
-    //Check chache for path data and draw it directly if it exists, else calculate the path data and add it to cache
-    if (this.pathCache.has(key)) {
-      const cachedData = this.pathCache.get(key);
-      if (cachedData) {
-        this.drawPathsFromCache(cachedData);
-        console.log("Path data loaded from cache", key);
-        return;
-      }
-    } else if (!this.pathCache.has(key)) {
-      console.log("Key not in cache. Recalculating path for key.", key);
-    }
-
-    //TODO refine cache max size
-    //Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
-    if (this.pathCache.size > 100) {
-      this.pathCache.clear();
-    }
-
     this.callCount++;
     console.log("callCount updatePath", this.callCount);
-    //setHours of date to 0 in order to calculate full day path
-    const date = new Date(currentDate);
-    date.setHours(0, 0, 0, 0);
 
-    const observer = new Astronomy.Observer(lat, lng, 0);
+    /**Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
+     * Keeping lastKey and restoring it after cache is cleared in order to minimize unnecessary recalculations
+     */
+    if (this.pathCache.size > pathCacheSize) {
+      const lastKey = this.currentPathKey;
+      if (lastKey) {
+        const cachedData = this.pathCache.get(lastKey);
+        console.log("Clearing path cache...");
+        this.pathCache.clear();
+        if (cachedData) this.pathCache.set(lastKey, cachedData);
+      }
+    }
 
-    //Calculate Sun and Moon Paths
-    const sunPathData = this.calculatePath72h(
-      Astronomy.Body.Sun,
-      observer,
-      date,
-    );
-    const moonPathData = this.calculatePath72h(
-      Astronomy.Body.Moon,
-      observer,
-      date,
-    );
-    //Add path data to cache
-    this.pathCache.set(key, {
-      sunPath: sunPathData.pathVertices,
-      moonPath: moonPathData.pathVertices,
-    });
-    //Draw data from cache
-    this.drawPathsFromCache({
-      sunPath: sunPathData.pathVertices,
-      moonPath: moonPathData.pathVertices,
-    });
+    const key = this.generatePathKey(lat, lng, date);
+    console.log("key", key);
+
+    // Calculate if key not in cache
+    if (!this.pathCache.has(key)) {
+      const observer = new Astronomy.Observer(lat, lng, 0);
+
+      //Calculate Sun and Moon Paths
+      const sunPathData = this.calculatePath72h(
+        Astronomy.Body.Sun,
+        observer,
+        date,
+      );
+      const moonPathData = this.calculatePath72h(
+        Astronomy.Body.Moon,
+        observer,
+        date,
+      );
+      //Add path data to cache
+      this.pathCache.set(key, {
+        sunPath: sunPathData.pathVertices,
+        moonPath: moonPathData.pathVertices,
+      });
+    }
+
+    this.currentPathKey = key;
+
     const end = performance.now();
     console.log(`Execution time updatePath: ${(end - start).toFixed(2)}ms`);
+  }
+
+  /**Render functions which are fast to access in order to keep main thread efficient
+   * Rendering respectively drawing of celestial bodies is only executed when the data can be directly retrieved from cache
+   */
+  public renderPath() {
+    if (!this.currentPathKey) return;
+    const cachedData = this.pathCache.get(this.currentPathKey);
+    if (cachedData) this.drawPathsFromCache(cachedData);
+  }
+
+  public renderPosition() {
+    if (!this.currentPositionKey) return;
+    const cachedData = this.positionCache.get(this.currentPositionKey);
+    if (cachedData) this.drawPositionFromCache(cachedData);
   }
 }
 

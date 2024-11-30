@@ -8,7 +8,6 @@ import {
 import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
 
 interface PhotoFeatureProps {
-  isDTLVisible: boolean;
   sunTimes: {
     sunrise: string;
     sunset: string;
@@ -27,7 +26,6 @@ interface PhotoFeatureProps {
  * Includes golden hour, blue hour, moon phases and supermoon text if supermoon.
  */
 const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
-  isDTLVisible,
   sunTimes,
   moonTimes,
   isSupermoon,
@@ -50,15 +48,16 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
     return hour < 12 ? "AM" : "PM";
   };
 
+  //TODO Fix the resizing issue
   return (
-    <div>
+    <>
       <Accordion
         expanded={expandedSunAccordion}
         onChange={() => handleAccordionToggle("sun")}
         sx={{
+          width: "100%",
+          marginTop: "1em",
           boxShadow: "none",
-          minWidth: "14em",
-          minHeight: "1.875em",
           "& .MuiAccordionSummary-root": {
             backgroundColor: "#faf5f5",
             paddingLeft: "0.5em",
@@ -71,9 +70,6 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
             fontWeight: "bold",
             lineHeight: "normal",
           },
-          top: isDTLVisible ? "10.025em" : "4.675em",
-          zIndex: 1600,
-          position: "absolute",
         }}
       >
         <AccordionSummary
@@ -81,7 +77,7 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           aria-controls="SunTimes"
           id="SunTimes"
         >
-          <Typography>SUN TIMES</Typography>
+          <Typography sx={{ textTransform: "uppercase" }}>Sun Times</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <Typography>
@@ -107,9 +103,8 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
         expanded={expandedMoonAccordion}
         onChange={() => handleAccordionToggle("moon")}
         sx={{
+          width: "100%",
           boxShadow: "none",
-          minWidth: "14em",
-          minHeight: "1.875em",
           "& .MuiAccordionSummary-root": {
             backgroundColor: "#faf5f5",
             paddingLeft: "0.5em",
@@ -122,9 +117,6 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
             fontWeight: "bold",
             lineHeight: "normal",
           },
-          top: isDTLVisible ? "13.175em" : "7.825em",
-          zIndex: 1500,
-          position: "absolute",
         }}
       >
         <AccordionSummary
@@ -132,7 +124,9 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           aria-controls="MoonTimes"
           id="MoonTimes"
         >
-          <Typography>MOON TIMES</Typography>
+          <Typography sx={{ textTransform: "uppercase" }}>
+            Moon Times
+          </Typography>
         </AccordionSummary>
         <AccordionDetails>
           <Typography>
@@ -146,7 +140,7 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           </Typography>
         </AccordionDetails>
       </Accordion>
-    </div>
+    </>
   );
 };
 

@@ -27,7 +27,6 @@ interface LeafletMapSetterProps {
 
 interface LeafletMapProps extends LeafletMapSetterProps {
   setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
-  isDTLVisible: boolean;
 }
 
 /** Setting the mapRef.current to the map object, making the map accessible from other components.  */
@@ -95,7 +94,6 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
   markers,
   setCenter,
   setMarkers,
-  isDTLVisible,
 }) => {
   /** Logic for deleting a preexisting marker. */
   const [inDeletionMode, setDeletionMode] = useState(false);
@@ -186,13 +184,13 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
             setDeletionMode(!inDeletionMode);
             setOpenSnackbarDel(true);
           }}
-          size="small"
-          style={{
+          sx={{
             position: "absolute",
-            top: isDTLVisible ? "6.875em" : "0.3em",
-            left: "1em",
-            zIndex: "1000",
+            zIndex: 1000,
+            bottom: "0.75em",
+            right: "1em",
           }}
+          size="small"
         >
           {inDeletionMode ? "Cancel Delete" : "Delete Marker"}
         </Button>
