@@ -135,9 +135,6 @@ class Moon {
   } {
     this.radius = radius;
 
-    //TODO: radians to degrees than +/-180 degrees => camera data or switch camera
-    //make camera rotating =>rotate to south
-
     //positionMoon is in radians => for spherical coords
     const x =
       this.radius *

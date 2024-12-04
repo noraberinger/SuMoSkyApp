@@ -1,9 +1,10 @@
 import React from "react";
-import Slider from "@mui/material/Slider";
+import { Slider, Typography } from "@mui/material/";
 
 interface ElevationSliderProps {
   value: number;
   onChange: (value: number) => void;
+  elevationCurrentCenter: number;
 }
 
 /** Generating the marking of the slider which depict elevation above sea level in m up to 10000m */
@@ -34,20 +35,10 @@ function valueText(value: number) {
 const ElevationSlider: React.FC<ElevationSliderProps> = ({
   value,
   onChange,
+  elevationCurrentCenter,
 }) => {
   return (
-    <div
-      style={{
-        marginTop: "2em",
-        padding: "0 1.75em",
-        marginBottom: "2em",
-        height: "91%",
-        width: "80%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
+    <>
       <Slider
         orientation="vertical"
         size="small"
@@ -62,6 +53,9 @@ const ElevationSlider: React.FC<ElevationSliderProps> = ({
         valueLabelDisplay={"on"}
         valueLabelFormat={valueText}
         sx={(theme) => ({
+          borderTop: "12px solid rgb(30,30,30)",
+          borderBottom: "12px solid rgb(30,30,30)",
+          backgroundColor: "rgb(30,30,30)",
           "& .MuiSlider-root": {
             backgroundColor: theme.palette.primary.light,
           },
@@ -70,7 +64,12 @@ const ElevationSlider: React.FC<ElevationSliderProps> = ({
           },
         })}
       />
-    </div>
+      <div style={{ color: "white", marginTop: "1em" }}>
+        <Typography>
+          Current Location: {Math.round(elevationCurrentCenter)}m + {value}m
+        </Typography>
+      </div>
+    </>
   );
 };
 

@@ -9,6 +9,7 @@ import {
   Button,
   ThemeProvider,
   Tooltip,
+  Typography,
 } from "@mui/material";
 import TerrenderCanvas from "./components/TerrenderCanvas";
 import LeafletMap, { positionZurich, Marker } from "./components/LeafletMap";
@@ -118,12 +119,11 @@ const App: React.FC = () => {
   );
 
   /** Elevation slider */
-  //TODO connect with actual height of TerrenderCanvas => take that as initial elevation
-  const initialElevationSlider = 1;
-  const [sliderElevation, setSliderElevation] = useState<number>(
-    initialElevationSlider,
-  );
+  const [sliderElevation, setSliderElevation] = useState<number>(0);
   const [showElevationSlider, setShowElevationSlider] = useState(false);
+  /** Get elevation data from Terrender */
+  const [elevationCurrentCenter, setElevationCurrentCenter] =
+    useState<number>(0);
 
   /** Visibility slider */
   const initialVisibilitySlider = 0;
@@ -136,9 +136,6 @@ const App: React.FC = () => {
 
   /** DTL Plans */
   const [savedPlans, setSavedPlans] = useState<Plan[]>([]);
-
-  /** Get elevation data from Terrender */
-  const [elevation, setElevation] = useState<number>(0);
 
   if (error) console.warn(error);
 
@@ -187,8 +184,9 @@ const App: React.FC = () => {
           <Tooltip
             title={
               <>
-                Toggle Location Search,
-                <br /> Calendar and Time visibility
+                <Typography>
+                  Toggle Search Location, <br /> Calendar and Time Slider.
+                </Typography>
               </>
             }
             arrow
@@ -293,6 +291,7 @@ const App: React.FC = () => {
               height: "100%",
               zIndex: 400,
               position: "absolute",
+              pointerEvents: "none",
             }}
           >
             <Grid container>
@@ -309,6 +308,7 @@ const App: React.FC = () => {
                   flexDirection: "row",
                   paddingLeft: "1em",
                   gap: "0.5em",
+                  pointerEvents: "all",
                 }}
               >
                 <DTLSave
@@ -333,6 +333,7 @@ const App: React.FC = () => {
                   display: "flex",
                   alignItems: "end",
                   flexDirection: "column",
+                  pointerEvents: "all",
                 }}
                 size={{ xs: 3 }}
               >
@@ -369,6 +370,7 @@ const App: React.FC = () => {
         </Grid>
         {/* TerrenderCanvas */}
         <Grid
+          container
           size={{ xs: 12, md: 6 }}
           sx={{ position: "relative", maxHeight: "100%", overflow: "hidden" }}
         >
@@ -379,12 +381,12 @@ const App: React.FC = () => {
                 center={center}
                 time={sliderTime}
                 date={selectedDate}
-                elevation={sliderElevation}
-                setSliderElevation={setSliderElevation}
-                visibility={sliderVisibility}
+                sliderElevation={sliderElevation}
+                sliderVisibility={sliderVisibility}
                 toggledTopDown={toggledTopDown}
                 setToggledTopDown={setToggledTopDown}
-                setElevation={setElevation}
+                setElevationCurrentCenter={setElevationCurrentCenter}
+                elevationCurrentCenter={elevationCurrentCenter}
               />
               <ThemeProvider theme={infoTheme}>
                 <Fab
@@ -406,50 +408,63 @@ const App: React.FC = () => {
             <div>Loading config</div>
           )}
           {error ? <div>Error: {error}</div> : null}
-        </Grid>
-        {/* UI Elevation/Visibility Sliders */}
-        <Grid
-          sx={{
-            position: "absolute",
-            bottom: "3em",
-            left: "58em",
-            top: isDTLVisible ? "5.25em" : "0em",
-            height: isDTLVisible ? "90.9%" : "100%",
-            zIndex: 2000,
-            display: "flex",
-            alignItems: "center",
-            backgroundColor: "rgba(60,60,60,0.6)",
-            overflow: "visible",
-          }}
-        >
-          {showElevationSlider && (
-            <ElevationSlider
-              value={sliderElevation}
-              onChange={setSliderElevation}
-            />
-          )}
-        </Grid>
-        <Grid
-          sx={{
-            position: "absolute",
-            top: isDTLVisible ? "5.25em" : "0em",
-            left: "66em",
-            width: "50%",
-            zIndex: 2000,
-            display: "flex",
-            alignItems: "center",
-            backgroundColor: "rgba(60,60,60,0.6)",
-            overflow: "hidden",
-          }}
-        >
-          {showVisibilitySlider && !toggledTopDown && (
-            <VisibilitySlider
-              value={sliderVisibility}
-              onChange={setSliderVisibility}
-              center={center}
-              selectedDate={selectedDate}
-            />
-          )}
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              zIndex: 400,
+              position: "absolute",
+              pointerEvents: "none",
+            }}
+          >
+            <Grid
+              container
+              spacing={1}
+              sx={{ height: "100%", alignContent: "flex-start" }}
+            >
+              {/* Spacer when DTL UI visible */}
+              <Grid
+                size={{ xs: 12 }}
+                sx={{ height: isDTLVisible ? "6em" : "0.75em" }}
+              />
+              {/* UI Elevation/Visibility Sliders */}
+              <Grid
+                size={{ xs: 2 }}
+                sx={{
+                  height: "60%",
+                  paddingLeft: "3.5em",
+                  paddingTop: "0.75em",
+                  pointerEvents: "all",
+                }}
+              >
+                {showElevationSlider && !toggledTopDown && (
+                  <ElevationSlider
+                    value={sliderElevation}
+                    onChange={setSliderElevation}
+                    elevationCurrentCenter={elevationCurrentCenter}
+                  />
+                )}
+              </Grid>
+              <Grid
+                size={{ xs: 10 }}
+                sx={{
+                  paddingRight: "3.5em",
+                  paddingTop: "0.75em",
+                  pointerEvents: "all",
+                }}
+              >
+                {showVisibilitySlider && !toggledTopDown && (
+                  <VisibilitySlider
+                    value={sliderVisibility}
+                    onChange={setSliderVisibility}
+                    center={center}
+                    selectedDate={selectedDate}
+                    sliderTime={sliderTime}
+                  />
+                )}
+              </Grid>
+            </Grid>
+          </div>
         </Grid>
       </Grid>
     </>

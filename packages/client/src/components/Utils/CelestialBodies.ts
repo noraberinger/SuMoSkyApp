@@ -48,7 +48,7 @@ class CelestialBodies {
     this.translationLocation = null;
     this.scaleLocation = null;
     this.colorLocation = null;
-    this.currentDirection = 0;
+    this.currentDirection = 360;
     this.callCount = 0;
     this.updatePositionCount = 0;
     this.createShaders();
@@ -435,30 +435,41 @@ class CelestialBodies {
   }
 
   /** Helper functions to generate cache keys => 2 different key as position needs more info in key than path does */
-  private generatePositionKey = (lat: number, lng: number, dateTime: Date) => {
+  private generatePositionKey = (
+    lat: number,
+    lng: number,
+    dateTime: Date,
+    currentDirection: number,
+  ) => {
     const day = String(dateTime.getDate()).padStart(2, "0");
     const month = String(dateTime.getMonth() + 1).padStart(2, "0");
     const year = String(dateTime.getFullYear());
     const hour = String(dateTime.getHours()).padStart(2, "0");
     const minute = String(dateTime.getMinutes()).padStart(2, "0");
-    const key = `${lat}-${lng}-${year}-${month}-${day}-${hour}-${minute}`;
+    const key = `${lat}-${lng}-${year}-${month}-${day}-${hour}-${minute}-${currentDirection}`;
     return key;
   };
 
-  private generatePathKey = (lat: number, lng: number, date: Date) => {
+  private generatePathKey = (
+    lat: number,
+    lng: number,
+    date: Date,
+    currentDirection: number,
+  ) => {
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = String(date.getFullYear());
-    const key = `${lat}-${lng}-${year}-${month}-${day}`;
+    const key = `${lat}-${lng}-${year}-${month}-${day}-${currentDirection}`;
     return key;
   };
 
   /** Update Sun/Moon Position when lat, lng, dateTime changes => inputs over search field, calendar and time slider */
-  public updatePosition(lat: number, lng: number, dateTime: Date) {
-    const start = performance.now();
-    this.updatePositionCount++;
-    console.log("updatePositionCount", this.updatePositionCount);
-
+  public updatePosition(
+    lat: number,
+    lng: number,
+    dateTime: Date,
+    currentDirection: number,
+  ) {
     /**Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
      * Keeping lastKey and restoring it after cache is cleared in order to minimize unnecessary recalculations
      */
@@ -472,12 +483,12 @@ class CelestialBodies {
       }
     }
 
-    const key = this.generatePositionKey(lat, lng, dateTime);
-    console.log("key", key);
+    const key = this.generatePositionKey(lat, lng, dateTime, currentDirection);
 
     // Calculate if key not in cache
     if (!this.positionCache.has(key)) {
       const observer = new Astronomy.Observer(lat, lng, 0);
+      this.currentDirection = currentDirection;
 
       // Get current Sun and Moon position
       const [sunX, sunY, sunAboveHorizon] = this.calculatePosition(
@@ -498,17 +509,15 @@ class CelestialBodies {
     }
 
     this.currentPositionKey = key;
-
-    const end = performance.now();
-    console.log(`Execution time updatePosition: ${(end - start).toFixed(2)}ms`);
   }
 
   /** Update Sun/Moon Path when lat, lng, date changes => inputs over search field and calendar */
-  public updatePath(lat: number, lng: number, date: Date) {
-    const start = performance.now();
-    this.callCount++;
-    console.log("callCount updatePath", this.callCount);
-
+  public updatePath(
+    lat: number,
+    lng: number,
+    date: Date,
+    currentDirection: number,
+  ) {
     /**Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
      * Keeping lastKey and restoring it after cache is cleared in order to minimize unnecessary recalculations
      */
@@ -522,12 +531,12 @@ class CelestialBodies {
       }
     }
 
-    const key = this.generatePathKey(lat, lng, date);
-    console.log("key", key);
+    const key = this.generatePathKey(lat, lng, date, currentDirection);
 
     // Calculate if key not in cache
     if (!this.pathCache.has(key)) {
       const observer = new Astronomy.Observer(lat, lng, 0);
+      this.currentDirection = currentDirection;
 
       //Calculate Sun and Moon Paths
       const sunPathData = this.calculatePath72h(
@@ -548,9 +557,6 @@ class CelestialBodies {
     }
 
     this.currentPathKey = key;
-
-    const end = performance.now();
-    console.log(`Execution time updatePath: ${(end - start).toFixed(2)}ms`);
   }
 
   /**Render functions which are fast to access in order to keep main thread efficient

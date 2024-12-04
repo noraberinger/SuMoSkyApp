@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import SearchIcon from "@mui/icons-material/Search";
-import { TextField, InputAdornment, Snackbar, Typography } from "@mui/material";
+import { TextField, InputAdornment, Snackbar, Alert } from "@mui/material";
 import "leaflet-control-geocoder";
 import L from "leaflet";
 import { Marker } from "./LeafletMap";
@@ -133,20 +133,16 @@ const SearchField: React.FC<SearchFieldProps> = ({
           },
         }}
       />
-      <Snackbar
-        open={openSnackbarMaxArray}
-        message={
-          <Typography
-            dangerouslySetInnerHTML={{
-              __html:
-                "Please delete an old marker before a new one can be added.",
-            }}
-          />
-        }
-        autoHideDuration={6000}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        onClose={handleSnackbarClose}
-      />
+      <Snackbar open={openSnackbarMaxArray} onClose={handleSnackbarClose}>
+        <Alert
+          onClose={handleSnackbarClose}
+          severity="warning"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          Please delete an old marker before a new one can be added.
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

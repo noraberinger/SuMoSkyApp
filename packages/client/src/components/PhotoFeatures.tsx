@@ -48,7 +48,6 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
     return hour < 12 ? "AM" : "PM";
   };
 
-  //TODO Fix the resizing issue
   return (
     <>
       <Accordion
@@ -80,21 +79,26 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           <Typography sx={{ textTransform: "uppercase" }}>Sun Times</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          <Typography>
-            Start Blue Hour AM: {sunTimes.blueHourMorning}{" "}
+          <Typography sx={{ textTransform: "uppercase" }}>
+            - Start Morning <br /> Blue Hour: {sunTimes.blueHourMorning}{" "}
             {getAmPm(sunTimes.blueHourMorning)}
             <br />
-            Sunrise: {sunTimes.sunrise} {getAmPm(sunTimes.sunrise)}
+            <br />- Sunrise: {sunTimes.sunrise} {getAmPm(sunTimes.sunrise)}
             <br />
-            End Golden Hour AM: {sunTimes.goldenHourMorning}{" "}
+            <br />
+            - End Morning <br /> Golden Hour: {sunTimes.goldenHourMorning}{" "}
             {getAmPm(sunTimes.goldenHourMorning)}
             <br />
-            Start Golden Hour PM: {sunTimes.goldenHourEvening}{" "}
+            <br />
+            - Start Evening <br /> Golden Hour: {
+              sunTimes.goldenHourEvening
+            }{" "}
             {getAmPm(sunTimes.goldenHourEvening)}
             <br />
-            Sunset: {sunTimes.sunset} {getAmPm(sunTimes.sunset)}
+            <br />- Sunset: {sunTimes.sunset} {getAmPm(sunTimes.sunset)}
             <br />
-            Start Blue Hour PM: {sunTimes.blueHourEvening}{" "}
+            <br />
+            - Start Evening <br /> Blue Hour: {sunTimes.blueHourEvening}{" "}
             {getAmPm(sunTimes.blueHourEvening)}
           </Typography>
         </AccordionDetails>
@@ -129,12 +133,12 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           </Typography>
         </AccordionSummary>
         <AccordionDetails>
-          <Typography>
-            Rise: {moonTimes.rise} {getAmPm(moonTimes.rise)}
+          <Typography sx={{ textTransform: "uppercase" }}>
+            - Rise: {moonTimes.rise} {getAmPm(moonTimes.rise)}
             <br />
-            Set: {moonTimes.set} {getAmPm(moonTimes.set)}
+            <br />- Set: {moonTimes.set} {getAmPm(moonTimes.set)}
             <br />
-            Moon Phase: {moonPhase.phase}
+            <br />- Moon Phase: {moonPhase.phase}
             <br />
             {isSupermoon ? "Supermoon" : ""}
           </Typography>

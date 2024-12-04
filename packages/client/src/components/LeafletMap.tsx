@@ -8,7 +8,7 @@ import {
   useMap,
 } from "react-leaflet";
 import L, { LatLngExpression } from "leaflet";
-import { Button, Snackbar, ThemeProvider, Typography } from "@mui/material";
+import { Button, Snackbar, ThemeProvider, Alert } from "@mui/material";
 import { handleSnackbarClose } from "./Utils/Calc";
 import { negativeActions } from "./Utils/ColorThemes";
 
@@ -195,32 +195,27 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
           {inDeletionMode ? "Cancel Delete" : "Delete Marker"}
         </Button>
       </ThemeProvider>
-      <Snackbar
-        open={openSnackbarDel}
-        message={
-          <Typography
-            dangerouslySetInnerHTML={{
-              __html:
-                "To delete a marker click on the marker icon of the marker you want to remove.",
-            }}
-          />
-        }
-        autoHideDuration={6000}
-        onClose={triggerSnackbarClose}
-      />
-      <Snackbar
-        open={openSnackbarGoLocation}
-        message={
-          <Typography
-            dangerouslySetInnerHTML={{
-              __html:
-                "Moving to location of clicked marker...<br /> If no movement occurs, please uncheck and recheck the checkbox of the Marker.",
-            }}
-          />
-        }
-        autoHideDuration={6000}
-        onClose={triggerSnackbarClose}
-      />
+      <Snackbar open={openSnackbarDel} onClose={triggerSnackbarClose}>
+        <Alert
+          onClose={triggerSnackbarClose}
+          severity="info"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          To delete a marker click on the marker icon of the marker you want to
+          remove.
+        </Alert>
+      </Snackbar>
+      <Snackbar open={openSnackbarGoLocation} onClose={triggerSnackbarClose}>
+        <Alert
+          onClose={triggerSnackbarClose}
+          severity="info"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          Moving to location of clicked marker...
+        </Alert>
+      </Snackbar>
     </MapContainer>
   );
 };

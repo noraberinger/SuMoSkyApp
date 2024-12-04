@@ -1,15 +1,19 @@
 //Data provided by Open-Meteo, licensed under CC-BY 4.0
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Slider, Snackbar, Typography } from "@mui/material";
-import { fetchWeatherApi } from "openmeteo";
+import React, { useState, useEffect } from "react";
+import { Slider, Snackbar, Alert, Typography } from "@mui/material";
 import { LatLngExpression } from "leaflet";
-import { convertLatLngToCoords, handleSnackbarClose } from "./Utils/Calc";
+import {
+  convertDateTime,
+  convertLatLngToCoords,
+  handleSnackbarClose,
+} from "./Utils/Calc";
 
 interface VisibilitySliderProps {
   value: number;
   onChange: (value: number) => void;
   center: LatLngExpression | undefined;
   selectedDate: Date;
+  sliderTime: number;
 }
 
 /** Generating the marking of the slider which depict elevation above sea level in m up to 10000m */
@@ -31,6 +35,58 @@ function valueText(value: number) {
   return `${value} m`;
 }
 
+/** Fetching of Visibility Forecast */
+type VisibilityByHour = { [time: number]: number };
+
+const openMeteoBaseURL = "https://api.open-meteo.com/v1/forecast";
+
+const useVisibilityData = (
+  latLng: LatLngExpression | undefined,
+): VisibilityByHour | undefined => {
+  const [visibilityData, setVisibilityData] = useState<VisibilityByHour>();
+  const coords = latLng ? convertLatLngToCoords(latLng) : undefined;
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(
+        `${openMeteoBaseURL}?latitude=${coords?.lat}&longitude=${coords?.lng}&hourly=visibility&forecast_days=16&format=json&timeformat=unixtime`,
+      );
+      const json = (await response.json()) as {
+        hourly: { time: number[]; visibility: number[] };
+      };
+
+      setVisibilityData(
+        Object.fromEntries(
+          json.hourly.time.map((t, i) => [t, json.hourly.visibility[i]]),
+        ),
+      );
+    };
+    if (coords?.lat && coords?.lng) {
+      fetchData();
+
+      /** Refetch data every hour */
+      const intervalId = setInterval(fetchData, 60 * 60 * 1000);
+      return () => clearInterval(intervalId);
+    }
+  }, [coords?.lat, coords?.lng]);
+
+  return visibilityData;
+};
+
+const getHourlyEpoch = (currentTime: Date) => {
+  //TODO checkout linear interpolation
+  const epochSeconds = Math.trunc(currentTime.valueOf() / 1000);
+
+  const secondsPastHour = epochSeconds % (60 * 60);
+
+  const roundedHourUp = epochSeconds + (60 * 60 - secondsPastHour);
+  //const roundedHourDown = epochSeconds - secondsPastHour;
+  //const ratio = secondsPastHour / (60 * 60);
+  //const interpolated = roundedHourDown + ratio * (roundedHourUp - roundedHourDown);
+
+  return roundedHourUp;
+};
+
 /**
  * @returns VisibilitySlider
  * Allowing user to range over different visibility settings (depth = +z-axis).
@@ -42,94 +98,31 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   onChange,
   center,
   selectedDate,
+  sliderTime,
 }) => {
-  const [forecastVisibility, setForecastVisibility] =
-    useState<Float32Array | null>(null);
-  const url = "https://api.open-meteo.com/v1/forecast";
-  const fetchAttempted = useRef(false);
   const [openSnackbarForecast, setOpenSnackbarForecast] = useState(false);
   const snackbarStates = { openSnackbarForecast };
   const setSnackbarStates = { openSnackbarForecast: setOpenSnackbarForecast };
-  const initialRender = useRef(true);
 
-  const fetchVisbilityData = useCallback(async (lat: number, lng: number) => {
-    if (fetchAttempted.current) return;
-    fetchAttempted.current = true;
+  /** Params for fetch */
+  const currentTime = convertDateTime(selectedDate, sliderTime);
+  const visibility = useVisibilityData(center);
 
-    try {
-      const params = {
-        latitude: lat,
-        longitude: lng,
-        hourly: ["visibility"],
-      };
-      const responses = await fetchWeatherApi(url, params);
-      const response = responses[0];
-      const hourly = response.hourly();
-      if (hourly) {
-        const visibility = hourly.variables(0)!.valuesArray()!;
-        if (visibility) setForecastVisibility(visibility);
-      } else {
-        console.warn("Weather data is not ready.");
-      }
-    } catch (error) {
-      console.error("Error fetching visibility data:", error);
-    }
-  }, []);
-
+  /** Snackbar Handling, trigger Snachbar when no forecast available */
   const triggerSnackbarClose = () => {
     handleSnackbarClose(snackbarStates, setSnackbarStates);
   };
 
+  const noVisibilityValue =
+    visibility && !visibility[getHourlyEpoch(currentTime)];
   useEffect(() => {
-    if (center && !fetchAttempted.current) {
-      const { lat, lng } = convertLatLngToCoords(center);
-      fetchVisbilityData(lat, lng);
+    if (noVisibilityValue) {
+      setOpenSnackbarForecast(true);
     }
-  }, [center, fetchVisbilityData]);
-
-  /** Refetch data when calendar date is changed */
-  useEffect(() => {
-    if (initialRender.current) {
-      initialRender.current = false;
-      return;
-    }
-
-    if (selectedDate) {
-      const currentDate = new Date();
-      //Difference between currentDate and selectedDate in ms
-      const differenceDays = Math.floor(
-        (selectedDate.getTime() - currentDate.getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-      if (differenceDays >= 0 && differenceDays <= 7 && center) {
-        fetchAttempted.current = false;
-        const { lat, lng } = convertLatLngToCoords(center);
-        fetchVisbilityData(lat, lng);
-        console.log("refetch of date");
-      } else {
-        setOpenSnackbarForecast(true);
-      }
-    }
-  }, [selectedDate, center, fetchVisbilityData]);
-
-  /** Refetch data every hour */
-  useEffect(() => {
-    const intervalId = setInterval(
-      () => {
-        if (center) {
-          fetchAttempted.current = false;
-          const { lat, lng } = convertLatLngToCoords(center);
-          fetchVisbilityData(lat, lng);
-        }
-      },
-      60 * 60 * 1000,
-    );
-
-    return () => clearInterval(intervalId);
-  }, [center, fetchVisbilityData]);
+  }, [noVisibilityValue]);
 
   return (
-    <div style={{ marginTop: "2em", padding: "0 1.75em", width: "75%" }}>
+    <>
       <Slider
         size="small"
         track={false}
@@ -143,6 +136,9 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
         valueLabelDisplay={"on"}
         valueLabelFormat={valueText}
         sx={(theme) => ({
+          borderLeft: "12px solid rgb(30,30,30)",
+          borderRight: "12px solid rgb(30,30,30)",
+          backgroundColor: "rgb(30,30,30)",
           "& .MuiSlider-root": {
             backgroundColor: theme.palette.primary.light,
           },
@@ -151,25 +147,25 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
           },
         })}
       />
-      {forecastVisibility && forecastVisibility.length > 0 && (
+      {!noVisibilityValue && (
         <div style={{ color: "white", marginTop: "1em" }}>
-          Current Visibility: {forecastVisibility[0]} m
+          <Typography>
+            Current Visibility: {visibility?.[getHourlyEpoch(currentTime)]}m
+          </Typography>
         </div>
       )}
-      <Snackbar
-        open={openSnackbarForecast}
-        message={
-          <Typography
-            dangerouslySetInnerHTML={{
-              __html:
-                "Forecast available for 7 days only. For your selected date no forecast data available.",
-            }}
-          />
-        }
-        autoHideDuration={6000}
-        onClose={triggerSnackbarClose}
-      />
-    </div>
+      <Snackbar open={openSnackbarForecast} onClose={triggerSnackbarClose}>
+        <Alert
+          onClose={triggerSnackbarClose}
+          severity="warning"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          Forecast available for 16 days. For your selected date no forecast
+          data available.
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

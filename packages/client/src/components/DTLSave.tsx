@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Snackbar, Typography, Fab, ThemeProvider } from "@mui/material/";
+import { Snackbar, Fab, ThemeProvider, Alert } from "@mui/material/";
 import { handleSnackbarClose } from "./Utils/Calc";
 import { Plan } from "./DTLLoadDelete";
 import { BookmarkAdd } from "@mui/icons-material/";
@@ -96,25 +96,23 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
           color="secondary"
           aria-label="showPlans"
           onClick={() => {
-            setOpenSnackbarDTL(!true);
+            setOpenSnackbarDTL(true);
             handleSaveDTL();
           }}
           size="small"
         >
           <BookmarkAdd />
         </Fab>
-        <Snackbar
-          open={openSnackbarDTL}
-          message={
-            <Typography
-              dangerouslySetInnerHTML={{
-                __html: "Saving current Date, Time and Location.",
-              }}
-            />
-          }
-          autoHideDuration={6000}
-          onClose={triggerSnackbarClose}
-        />
+        <Snackbar open={openSnackbarDTL} onClose={triggerSnackbarClose}>
+          <Alert
+            onClose={triggerSnackbarClose}
+            severity="success"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            Saved current Date, Time and Location.
+          </Alert>
+        </Snackbar>
       </ThemeProvider>
     </div>
   );

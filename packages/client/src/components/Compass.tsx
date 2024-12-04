@@ -55,6 +55,7 @@ const Compass: React.FC<CompassProps> = ({
       const radius = Math.sqrt(
         (position[0] - target[0]) ** 2 + (position[1] - target[1]) ** 2,
       );
+      console.log("radius !topDown", radius);
 
       // Compass direction in radians
       const angleInRadians = (direction * Math.PI) / 180;
@@ -70,19 +71,19 @@ const Compass: React.FC<CompassProps> = ({
     [],
   );
 
-  //TODO fix rotation
+  //TODO fix rotation, radius def wrong + rotation, currently north is south and vice versa after 1 full rotation
   const calculateTopDownCamTarget = useCallback(
     (direction: number, position: number[], target: number[]) => {
       const radius = position[2];
-      // Compass direction in radians
       const angleInRadians = (direction * Math.PI) / 180;
+      console.log("radius topDown", radius);
 
-      // Move around fixed center
-      const newTargetX = radius * Math.cos(angleInRadians);
-      const newTargetZ = target[2];
-      const newTargetY = radius * Math.sin(angleInRadians);
+      // Keep target fixed, move camera position
+      const newPosX = target[0] + radius * Math.sin(angleInRadians);
+      const newPosY = target[1] + radius * Math.cos(angleInRadians);
+      const newPosZ = position[2]; // Maintain height
 
-      return [newTargetY, newTargetX, newTargetZ];
+      return [newPosX, newPosY, newPosZ];
     },
     [],
   );
@@ -115,10 +116,10 @@ const Compass: React.FC<CompassProps> = ({
         const currentMouseAngle = getAngleFromCenter(compassElement, event);
         const angleDelta = currentMouseAngle - startMouseAngle;
         const newDirection = (startAngle + angleDelta + 360) % 360;
-        setCurrentDirection(newDirection);
-        updateCompass(newDirection);
 
         if (camera && !topDown) {
+          setCurrentDirection(newDirection);
+          updateCompass(newDirection);
           const newTarget = calculateCamTarget(
             newDirection,
             camera.position,
@@ -126,12 +127,13 @@ const Compass: React.FC<CompassProps> = ({
           );
           camera.changeCamPosition(camera.position, newTarget);
         } else if (camera && topDown) {
-          const newTarget = calculateTopDownCamTarget(
+          updateCompass(newDirection);
+          const newPosition = calculateTopDownCamTarget(
             newDirection,
             camera.position,
             camera.target,
           );
-          camera.changeCamPosition(camera.position, newTarget);
+          camera.changeCamPosition(newPosition, camera.target);
         }
       }
     },
@@ -164,16 +166,6 @@ const Compass: React.FC<CompassProps> = ({
   useEffect(() => {
     updateCompass(currentDirection);
   }, [currentDirection]);
-
-  useEffect(() => {
-    if (camera && camera.hasChanged()) {
-      const yaw = Math.atan2(camera.viewDirection[0], camera.viewDirection[2]);
-      const direction = (yaw * 180) / Math.PI;
-      const compassHeading = (direction + 360) % 360;
-      setCurrentDirection(compassHeading);
-      updateCompass(compassHeading);
-    }
-  }, [camera, setCurrentDirection]);
 
   useEffect(() => {
     const compassElement = document.getElementById("compass");
