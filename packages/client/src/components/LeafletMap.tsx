@@ -10,7 +10,8 @@ import {
 import L, { LatLngExpression } from "leaflet";
 import { Button, Snackbar, ThemeProvider, Alert } from "@mui/material";
 import { handleSnackbarClose } from "./Utils/Calc";
-import { negativeActions } from "./Utils/ColorThemes";
+import { functionalities } from "./Utils/ColorThemes";
+import { Room as MarkerIcon } from "@mui/icons-material";
 
 export type Marker = {
   id: string;
@@ -176,13 +177,13 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       </LayersControl>
       <ZoomControl position="bottomleft" />
       {/* Deletion of Marker */}
-      <ThemeProvider theme={negativeActions}>
+      <ThemeProvider theme={functionalities}>
         <Button
           variant="contained"
           color="secondary"
           onClick={() => {
             setDeletionMode(!inDeletionMode);
-            setOpenSnackbarDel(true);
+            if (!inDeletionMode) setOpenSnackbarDel(true);
           }}
           sx={{
             position: "absolute",
@@ -192,7 +193,8 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
           }}
           size="small"
         >
-          {inDeletionMode ? "Cancel Delete" : "Delete Marker"}
+          {inDeletionMode ? "Cancel Delete" : "Delete "}
+          <MarkerIcon />
         </Button>
       </ThemeProvider>
       <Snackbar open={openSnackbarDel} onClose={triggerSnackbarClose}>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import SunCalc from "suncalc";
+import * as Astronomy from "astronomy-engine";
 import L from "leaflet";
 import {
   convertDateTime,
@@ -63,13 +64,21 @@ const calculateMoonPosition = (
   return { azimuth, altitude, distance };
 };
 
+/** Issue when calculating times using suncalc => if moon sets on the previous or next calendar day suncalc.getMoonTimes returns undefined
+ *  Astronomy engine is used to calculate moon rise and set times, as a workaround. */
 const calculateMoonTimes = (
+  body: Astronomy.Body,
   date: Date,
   lat: number,
   lng: number,
-): { rise: Date; set: Date } => {
-  const times = SunCalc.getMoonTimes(date, lat, lng, true);
-  return { rise: times.rise, set: times.set };
+): { rise: Date | null; set: Date | null } => {
+  const observer = new Astronomy.Observer(lat, lng, 0);
+  const astroDate = new Astronomy.AstroTime(date);
+  const rise = Astronomy.SearchRiseSet(body, observer, +1, astroDate, -1, 0);
+  const set = Astronomy.SearchRiseSet(body, observer, -1, astroDate, -1, 0);
+  const riseTime = rise ? rise.date : null;
+  const setTime = set ? set.date : null;
+  return { rise: riseTime, set: setTime };
 };
 
 const calculateMoonPhase = (date: Date): { phase: number } => {
@@ -246,15 +255,22 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
       const sunTimes = calculateSunTimes(lat, lng, date);
 
       const positionMoon = calculateMoonPosition(lat, lng, sliderDateTime);
-      const moonTimes = calculateMoonTimes(date, lat, lng);
+      const moonRiseSet = calculateMoonTimes(
+        Astronomy.Body.Moon,
+        date,
+        lat,
+        lng,
+      );
       const moonPhase = calculateMoonPhase(date);
 
       let sunbeamDistance;
       let moonbeamDistance;
 
       if (
-        sliderDateTime.getTime() < sunTimes.sunrise.getTime() ||
-        sliderDateTime.getTime() > sunTimes.sunset.getTime()
+        (sunTimes.sunrise &&
+          sliderDateTime.getTime() < sunTimes.sunrise.getTime()) ||
+        (sunTimes.sunset &&
+          sliderDateTime.getTime() > sunTimes.sunset.getTime())
       ) {
         sunbeamDistance = 1300;
         moonbeamDistance = 1500;
@@ -265,7 +281,7 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
 
       return {
         sunTimes,
-        moonTimes,
+        moonRiseSet,
         positionMoon,
         positionSun,
         moonPhase,
@@ -298,17 +314,13 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
         }
       });
 
-      const sunriseTime = celestialBodies.sunTimes.sunrise;
-      const sunsetTime = celestialBodies.sunTimes.sunset;
-      const riseTime = celestialBodies.moonTimes.rise;
-      const setTime = celestialBodies.moonTimes.set;
       const moonPhase = celestialBodies.moonPhase.phase;
       setMoonPhase({ phase: getMoonPhase(moonPhase) });
 
       const sunLayer: L.Layer[] = [];
       const moonLayer: L.Layer[] = [];
 
-      if (sunriseTime && sunsetTime && showSun) {
+      if (showSun) {
         const sunbeamAnchor = getAnchorPoint(
           lat,
           lng,
@@ -417,16 +429,14 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
         sunLayer.push(
           sunCircle,
           shadedArea,
-          sunbeamLine,
-          sunbeamBall,
           sunrisebeamLine,
           sunsetbeamLine,
+          sunbeamLine,
+          sunbeamBall,
         );
-      } else {
-        console.warn("Times for sun not ready.");
       }
 
-      if (riseTime && setTime && showMoon) {
+      if (showMoon) {
         const moonbeamAnchor = getAnchorPoint(
           lat,
           lng,
@@ -460,10 +470,17 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
           1,
         );
 
+        if (
+          !celestialBodies.moonRiseSet.rise ||
+          !celestialBodies.moonRiseSet.set
+        ) {
+          console.warn("Moon rise or set time is not available");
+          return;
+        }
         const moonrisePosition = calculateMoonPosition(
           lat,
           lng,
-          celestialBodies.moonTimes.rise,
+          celestialBodies.moonRiseSet.rise,
         );
         const moonriseAnchor = getAnchorPoint(
           lat,
@@ -479,14 +496,14 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
           2,
         );
         moonriseLine.bindTooltip(
-          `Moon rises ${celestialBodies.moonTimes.rise.getHours()}:${celestialBodies.moonTimes.rise.getMinutes().toString().padStart(2, "0")}`,
+          `Moon rises ${celestialBodies.moonRiseSet.rise.getHours()}:${celestialBodies.moonRiseSet.rise.getMinutes().toString().padStart(2, "0")}`,
           { sticky: true, direction: "auto" },
         );
 
         const moonsetPosition = calculateMoonPosition(
           lat,
           lng,
-          celestialBodies.moonTimes.set,
+          celestialBodies.moonRiseSet.set,
         );
         const moonsetAnchor = getAnchorPoint(
           lat,
@@ -502,7 +519,7 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
           2,
         );
         moonsetLine.bindTooltip(
-          `Moon sets ${celestialBodies.moonTimes.set.getHours()}:${celestialBodies.moonTimes.set.getMinutes().toString().padStart(2, "0")}`,
+          `Moon sets ${celestialBodies.moonRiseSet.set.getHours()}:${celestialBodies.moonRiseSet.set.getMinutes().toString().padStart(2, "0")}`,
           { sticky: true, direction: "auto" },
         );
 
@@ -517,20 +534,18 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
         );
         shadedArea.bindTooltip("Moonlit hours.");
 
-        const rise = `${celestialBodies.moonTimes.rise.getHours()}:${celestialBodies.moonTimes.rise.getMinutes().toString().padStart(2, "0")}`;
-        const set = `${celestialBodies.moonTimes.set.getHours()}:${celestialBodies.moonTimes.set.getMinutes().toString().padStart(2, "0")}`;
+        const rise = `${celestialBodies.moonRiseSet.rise.getHours()}:${celestialBodies.moonRiseSet.rise.getMinutes().toString().padStart(2, "0")}`;
+        const set = `${celestialBodies.moonRiseSet.set.getHours()}:${celestialBodies.moonRiseSet.set.getMinutes().toString().padStart(2, "0")}`;
         setMoonTimes({ rise, set });
 
         moonLayer.push(
           moonCircle,
           shadedArea,
-          moonbeamLine,
-          moonbeamBall,
           moonriseLine,
           moonsetLine,
+          moonbeamLine,
+          moonbeamBall,
         );
-      } else {
-        console.warn("Times for moon not ready.");
       }
 
       if (celestialBodies.moonbeamDistance === 1500) {

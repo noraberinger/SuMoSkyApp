@@ -27,7 +27,7 @@ import {
 import DTLSave from "./components/DTLSave";
 import DTLLoadDelete, { Plan } from "./components/DTLLoadDelete";
 import PhotoFeatures from "./components/PhotoFeatures";
-import { infoTheme } from "./components/Utils/ColorThemes";
+import { sunTheme, moonTheme } from "./components/Utils/ColorThemes";
 import { tooltipTheme } from "./components/Utils/TooltipTheme";
 
 interface ClientConfig {
@@ -211,8 +211,8 @@ const App: React.FC = () => {
             top: "0em",
             left: "0em",
             zIndex: 500,
-            backgroundColor: "rgba(60,60,60,0.6)",
-            borderBottom: "2px solid rgb(30,30,30)",
+            backgroundColor: "rgba(60,60,60,0.9)",
+            borderBottom: "2px solid rgba(30,30,30,0.9)",
           }}
         >
           <Grid
@@ -338,25 +338,28 @@ const App: React.FC = () => {
                 size={{ xs: 3 }}
               >
                 {/* Show/Hide Sun/Moon */}
-                <ThemeProvider theme={infoTheme}>
-                  <ButtonGroup
-                    orientation="vertical"
-                    aria-label="SunAndMoonControls"
-                    variant="contained"
-                    size="small"
-                    color="info"
-                    sx={{ width: "50%" }}
-                  >
+                <ButtonGroup
+                  orientation="vertical"
+                  aria-label="SunAndMoonControls"
+                  variant="contained"
+                  size="small"
+                  color="info"
+                  sx={{ width: "50%" }}
+                >
+                  <ThemeProvider theme={sunTheme}>
                     <Button onClick={() => setShowSun(!showSun)}>
-                      {showSun ? "Hide " : "Show "}
+                      {showSun ? "Hide " : "Show "}&nbsp;&nbsp;
                       <SunIcon />
                     </Button>
+                  </ThemeProvider>
+                  <ThemeProvider theme={moonTheme}>
                     <Button onClick={() => setShowMoon(!showMoon)}>
-                      {showMoon ? "Hide " : "Show "}
+                      {showMoon ? "Hide " : "Show "}&nbsp;&nbsp;
                       <MoonIcon />
                     </Button>
-                  </ButtonGroup>
-                </ThemeProvider>
+                  </ThemeProvider>
+                </ButtonGroup>
+
                 {/* PhotoFeatures */}
                 <PhotoFeatures
                   sunTimes={sunTimes}
@@ -388,20 +391,33 @@ const App: React.FC = () => {
                 setElevationCurrentCenter={setElevationCurrentCenter}
                 elevationCurrentCenter={elevationCurrentCenter}
               />
-              <ThemeProvider theme={infoTheme}>
-                <Fab
-                  color="info"
-                  aria-label="Elevation/Visibility"
-                  onClick={handleFabClick}
-                  sx={{
-                    position: "absolute",
-                    bottom: 60,
-                    right: "1em",
-                    zIndex: 1500,
-                  }}
+              <ThemeProvider theme={tooltipTheme}>
+                <Tooltip
+                  title={
+                    <>
+                      <Typography>
+                        Toggle Elevation and Visibility Sliders
+                      </Typography>
+                    </>
+                  }
+                  arrow
+                  placement="left"
                 >
-                  <TuneIcon />
-                </Fab>
+                  <Fab
+                    aria-label="Elevation/Visibility"
+                    onClick={handleFabClick}
+                    sx={{
+                      color: "#fff",
+                      backgroundColor: "#878787",
+                      position: "absolute",
+                      bottom: 60,
+                      right: "1em",
+                      zIndex: 1500,
+                    }}
+                  >
+                    <TuneIcon />
+                  </Fab>
+                </Tooltip>
               </ThemeProvider>
             </>
           ) : (

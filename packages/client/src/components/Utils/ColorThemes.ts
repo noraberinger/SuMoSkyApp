@@ -19,10 +19,34 @@ export const negativeActions = createTheme({
   },
 });
 
+export const functionalities = createTheme({
+  palette: {
+    secondary: {
+      main: "#878787",
+    },
+  },
+});
+
 export const infoTheme = createTheme({
   palette: {
-    info: {
+    secondary: {
       main: "#3333ff",
+    },
+  },
+});
+
+export const sunTheme = createTheme({
+  palette: {
+    info: {
+      main: "#ffff00",
+    },
+  },
+});
+
+export const moonTheme = createTheme({
+  palette: {
+    info: {
+      main: "#0000ff",
     },
   },
 });

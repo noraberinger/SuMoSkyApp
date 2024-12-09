@@ -58,13 +58,13 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           marginTop: "1em",
           boxShadow: "none",
           "& .MuiAccordionSummary-root": {
-            backgroundColor: "#faf5f5",
+            backgroundColor: "#878787",
             paddingLeft: "0.5em",
           },
           "& .MuiAccordionDetails-root": { padding: "0em" },
           "& .MuiTypography-root": {
-            color: "#333",
-            background: "#faf5f5",
+            color: "#fff",
+            background: "#878787",
             fontSize: "0.85rem",
             fontWeight: "bold",
             lineHeight: "normal",
@@ -110,13 +110,13 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           width: "100%",
           boxShadow: "none",
           "& .MuiAccordionSummary-root": {
-            backgroundColor: "#faf5f5",
+            backgroundColor: "#878787",
             paddingLeft: "0.5em",
           },
           "& .MuiAccordionDetails-root": { padding: "0em" },
           "& .MuiTypography-root": {
-            color: "#333",
-            background: "#faf5f5",
+            color: "#fff",
+            background: "#878787",
             fontSize: "0.85rem",
             fontWeight: "bold",
             lineHeight: "normal",
