@@ -58,7 +58,7 @@ export const calculateSunTimes = (
   };
 };
 
-/** Closing of any Snackbar */
+/** Helper function closing any Snackbar */
 export const handleSnackbarClose = (
   snackbarStates: { [key: string]: boolean },
   setSnackbarStates: {

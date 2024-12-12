@@ -21,6 +21,12 @@ interface PhotoFeatureProps {
   moonPhase: { phase: string };
 }
 
+const getAmPm = (timeString: string) => {
+  const [hours] = timeString.split(":");
+  const hour = parseInt(hours, 10);
+  return hour < 12 ? "AM" : "PM";
+};
+
 /**
  * @returns Accordion showing interesting photofeatures.
  * Includes golden hour, blue hour, moon phases and supermoon text if supermoon.
@@ -40,12 +46,6 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
     } else if (type === "moon") {
       setExpandedMoonAccordion(!expandedMoonAccordion);
     }
-  };
-
-  const getAmPm = (timeString: string) => {
-    const [hours] = timeString.split(":");
-    const hour = parseInt(hours, 10);
-    return hour < 12 ? "AM" : "PM";
   };
 
   return (

@@ -85,7 +85,7 @@ const zoom = (
 
 /**
  * @returns LeafletMap
- * Basic setup for dynamic map using leaflet library and openstreep map as TileLayer:
+ * Basic setup for dynamic map using leaflet library and openstreet map as TileLayer:
  * * https://leafletjs.com/reference.html
  * * https://www.openstreetmap.org
  */

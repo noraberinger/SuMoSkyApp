@@ -133,10 +133,10 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   //Helper function setting setShouldRedrawCallback in Terrender
   const forceRender = useCallback(() => {
     if (terrenderRef.current) {
-      // setShouldRedrawCallback is evaluated in Terrender's renderLoop. if true, it forces a render
+      // setShouldRedrawCallback is evaluated in renderLoop of Terrender. If true, it forces a render.
       terrenderRef.current.setShouldRedrawCallback(() => true);
       // setRenderLoopCallback is called after renderLoop, with didDraw indicating if Terrender actually rendered something
-      // we'll use it to disable redraw callback again, to avoid terrender rendering in circles
+      // used to disable redraw callback again, to avoid terrender rendering in circles
       terrenderRef.current.setRenderLoopCallback((didDraw: boolean) => {
         if (didDraw) terrenderRef.current?.setShouldRedrawCallback(() => false);
         /** Check if tile data is loaded */
@@ -154,12 +154,11 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
 
   /** Draw all elements except terrender => terrender will be drawn after setPreDrawCallback => drawCustom(drawSky) */
   const drawSky = useCallback((didDraw: boolean) => {
-    // skyCall++;
-    ///  console.error("skycall", skyCall);
     if (didDraw && skyquadRef.current && celestialBodiesRef.current) {
       skyquadRef.current.render();
       celestialBodiesRef.current.renderPath();
       celestialBodiesRef.current.renderPosition();
+      celestialBodiesRef.current.renderTracingLine();
     }
   }, []);
 
@@ -284,6 +283,34 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     latLngToCoordsMemo.lng,
     dateTimeMemo,
     currentDirection,
+  ]);
+
+  //Tracing Hook
+  useEffect(() => {
+    if (celestialBodiesRef.current && terrenderRef.current) {
+      if (elevationCurrentCenter > 0) {
+        celestialBodiesRef.current.updateTracingLine(
+          latLngToCoordsMemo.lat,
+          latLngToCoordsMemo.lng,
+          date,
+          elevationCurrentCenter,
+        );
+        console.log("elevation", elevationCurrentCenter);
+      }
+
+      celestialBodiesRef.current.getTraceForTime(dateTimeMemo);
+      console.log(
+        "currentTrace",
+        celestialBodiesRef.current.getTraceForTime(dateTimeMemo),
+      );
+    }
+  }, [
+    date,
+    dateTimeMemo,
+    elevationCurrentCenter,
+    forceRender,
+    latLngToCoordsMemo.lat,
+    latLngToCoordsMemo.lng,
   ]);
 
   //TODO: visibility: farPlane zvector change in camera, projectiveProjection, convert z into real world with heightScaling Parameter, shader scalingFactor terrainRendering fragment shader make it white
@@ -441,11 +468,11 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         elevation,
       );
       if (isTopDown) {
-        const newPosition = [lng, lat, 0.1];
-        const newTarget = [lng, lat, 0];
+        const topDownPosition = [lng, lat, 0.1];
+        const topDownTarget = [lng, lat, 0];
         terrenderRef.current
           .getCamera()
-          .lookAt(newPosition, newTarget, [0, 1, 0]);
+          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]);
       } else {
         const newPos = [lng, lat, z];
         const newTarget = [
@@ -454,7 +481,8 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         ];
         terrenderRef.current.getCamera().changeCamPosition(newPos, newTarget);
       }
-      setCurrentDirection(0);
+      //setCurrentDirection(0);
+      console.log("target", terrenderRef.current.getCamera().target);
     }
   }, [
     center,
@@ -466,39 +494,36 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   ]);
 
   /**
-   * Functionality Button which allows user to change to top down view of Terrender and back.
-   * Makes use of @mui Button component:
-   * * https://mui.com/material-ui/react-button/
+   * Toggles the camera view between top-down mode and the previous mode.
+   * If top-down mode is enabled, it saves the current camera position and target,
+   * then sets the camera to a top-down view. If top-down mode is disabled, it restores
+   * the saved camera position and target.
    */
+  //TODO: Bug when orientation is S normal, top down => N, normal => orientation S but compass heading N
   const toggleTopDownMode = () => {
     if (terrenderRef.current) {
-      /** Reset topDownMode */
+      /**
+       * Reset top-down mode by restoring the camera's previous position and target.
+       * This will disable the top-down view and revert to the original camera settings.
+       */
       if (topDownConfigs) {
         terrenderRef.current
           .getCamera()
           .lookAt(topDownConfigs.position, topDownConfigs.target, [0, 0, 1]);
         setTopDownConfigs(undefined);
       } else {
-        /** Enable topDown view, Keep track of prev values using setTopDown.
-         *  - Coordinate system gl:
-         *      x: horizontal, +x on right;
-         *      y: vertical, +y on top;
-         *      z: backwards and forward, +z backwards.
-         *  - position[2]: z-coordinate of current camera position.
-         *  - target: [position[0], position[1], 0], camera looks at target => looks at current position, coordinates of target are therefore: [x: lng (E,W), y: lat (S,N), z: 0].
-         *  - initialUp: v3[], "up" direction of the camera => vector pointing from inner centre in direction of the v3[].
-         */
+        // Enable topDown view, Keep track of prev values using setTopDownConfigs
         const { position, target } = terrenderRef.current.getCamera();
         setTopDownConfigs({
           position,
           target,
         });
 
-        const newPosition = [position[0], position[1], 0.1];
-        const newTarget = [position[0], position[1], 0];
+        const topDownPosition = [position[0], position[1], 0.1];
+        const topDownTarget = [position[0], position[1], 0];
         terrenderRef.current
           .getCamera()
-          .lookAt(newPosition, newTarget, [0, 1, 0]);
+          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]);
       }
     }
   };

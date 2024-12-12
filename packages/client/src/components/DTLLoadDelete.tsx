@@ -45,6 +45,21 @@ export type Plan = {
   currentTime: number;
 };
 
+const getLatLngAsString = (location: L.LatLngExpression): string => {
+  const { lat, lng } = convertLatLngToCoords(location);
+  return `Lat: ${lat.toFixed(2)}, Lng: ${lng.toFixed(2)}`;
+};
+
+const getTimeAsString = (time: number): string => {
+  const hour = Math.floor(time / 6);
+  const minute = (time % 6) * 10;
+  if (minute != 0) {
+    return `${hour}:${minute}`;
+  } else {
+    return `${hour}:${minute}0`;
+  }
+};
+
 /**
  * @returns Table showing saved DTL PLans
  * Gets DTL from local storage.
@@ -93,21 +108,6 @@ const DTLLoadDelete: React.FC<DTLLoadDeleteProps> = ({
   };
 
   const toggleTable = () => setTableIsOpen(!tableIsOpen);
-
-  const getLatLngAsString = (location: L.LatLngExpression): string => {
-    const { lat, lng } = convertLatLngToCoords(location);
-    return `Lat: ${lat.toFixed(2)}, Lng: ${lng.toFixed(2)}`;
-  };
-
-  const getTimeAsString = (time: number): string => {
-    const hour = Math.floor(time / 6);
-    const minute = (time % 6) * 10;
-    if (minute != 0) {
-      return `${hour}:${minute}`;
-    } else {
-      return `${hour}:${minute}0`;
-    }
-  };
 
   const handleNameChange = (index: number, name: string) => {
     setNames((prevNames) => {

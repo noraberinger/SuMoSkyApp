@@ -10,21 +10,30 @@ interface Vertex {
   azimuth: number;
 }
 
+interface Trace {
+  minute: number;
+  from: [number, number];
+  to: [number, number];
+}
+
 const pathCacheSize = 30; //in total allowing 30 center and/or date changes => should be enough if user has fixed landmark and date in mind
 const positionCacheSize = pathCacheSize * (144 * 0.5); //144 as each day has 24 * 6 10min intervals => slider steps in 10min steps
+const pathSamplingRate = 1;
+const tracingCacheSize = positionCacheSize; //same size as positionCacheSize as max amount of tracing lines is equal to max amount of positions
+const tracingSamplingRate = 10; //sampling every 10 minutes for tracing lines
 
 class CelestialBodies {
   private gl: WebGL2RenderingContext | WebGLRenderingContext;
   private shaderProgramInfo: twgl.ProgramInfo | null;
   private pathBuffer: WebGLBuffer | null;
   private circleBuffer: WebGLBuffer | null;
+  private lineBuffer: WebGLBuffer | null;
   private positionLocation: number;
   private translationLocation: WebGLUniformLocation | null;
   private scaleLocation: WebGLUniformLocation | null;
   private colorLocation: WebGLUniformLocation | null;
   private currentDirection: number;
-  private callCount: number;
-  private updatePositionCount: number;
+  private maxElevation: number;
   private pathCache = new Map<
     string,
     { sunPath: Float32Array; moonPath: Float32Array }
@@ -36,21 +45,24 @@ class CelestialBodies {
       moon: [number, number, boolean];
     }
   >();
+  private tracingCache = new Map<string, Trace[]>();
   private currentPathKey?: string;
   private currentPositionKey?: string;
+  private currentTracingKey?: string;
+  private currentTrace?: Trace;
 
   constructor(gl: WebGL2RenderingContext | WebGLRenderingContext) {
     this.gl = gl;
     this.shaderProgramInfo = null;
     this.pathBuffer = null;
     this.circleBuffer = null;
+    this.lineBuffer = null;
     this.positionLocation = 0;
     this.translationLocation = null;
     this.scaleLocation = null;
     this.colorLocation = null;
-    this.currentDirection = 360;
-    this.callCount = 0;
-    this.updatePositionCount = 0;
+    this.currentDirection = 0;
+    this.maxElevation = 10000; //max elevation in meters, same as max elevation for elevation slider and max elevation that camera can be moved up or down
     this.createShaders();
     this.createBuffers();
   }
@@ -59,6 +71,11 @@ class CelestialBodies {
   private createShaders() {
     const vertexShader = this.gl.createShader(this.gl.VERTEX_SHADER)!;
     const fragmentShader = this.gl.createShader(this.gl.FRAGMENT_SHADER)!;
+
+    if (!vertexShader || !fragmentShader) {
+      console.warn("Shader creation for celestial bodies failed.");
+      return;
+    }
 
     this.gl.shaderSource(vertexShader, celestialBodiesVs);
     this.gl.compileShader(vertexShader);
@@ -88,6 +105,7 @@ class CelestialBodies {
 
       this.circleBuffer = this.gl.createBuffer();
       this.pathBuffer = this.gl.createBuffer();
+      this.lineBuffer = this.gl.createBuffer();
 
       const circleVertices = this.createCircleVertices();
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.circleBuffer);
@@ -103,6 +121,16 @@ class CelestialBodies {
     }
   }
 
+  //Screen space coordinates for intersection line are x: [-2, 2], y:[-1, 1]
+  private createIntersectionLine(
+    x_1: number,
+    y_1: number,
+    x_2: number,
+    y_2: number,
+  ): Float32Array {
+    return new Float32Array([x_1, y_1, x_2, y_2]);
+  }
+
   //CircleVertices for Sun/Moon object
   private createCircleVertices(segments = 32): Float32Array {
     const vertices = [];
@@ -113,21 +141,32 @@ class CelestialBodies {
     return new Float32Array(vertices);
   }
 
-  private normalizeAzimuth(azimuth: number, currentDirection: number): number {
-    //Adjust direction such that currentDirection from compass is in between 0 and 360°
-    currentDirection = ((currentDirection % 360) + 360) % 360;
+  //Wrapping azimuth to [-180,180]°
+  private wrapAzimuth(azimuth: number): number {
+    return ((((azimuth + 180) % 360) + 360) % 360) - 180;
+  }
 
-    //Ensure that azimuth is in between +/- 180° as Terrender set up this way => basically terrender canvas edge = horizon
-    let relativeAzimuth = azimuth - currentDirection;
-    //Shift difference from [-180,180] to [0,360], modulo to wrap exceeding angles, add 360 and modulo to make result positive, shift back to [-180,180]
-    relativeAzimuth = ((((relativeAzimuth + 180) % 360) + 360) % 360) - 180;
-
-    //Handle edge cases at boundaries where azimuth changes from 0° to 360° degrees => smoothing of gap
-    if (relativeAzimuth < -175 && azimuth > 355) {
+  /** Smooth transition at boundaries:
+   *  Path normalized to screen space => normalizedAzimuth/90; 175/90=1.94 units screen space
+   *  180-175=5 gap on each side, trying to prevent sharp edges at boundaries
+   */
+  private smoothAzimuthGap(relativeAzimuth: number, azimuth: number): number {
+    if (relativeAzimuth < -175 && azimuth > 175) {
       relativeAzimuth += 360;
-    } else if (relativeAzimuth > 175 && azimuth < 5) {
+    } else if (relativeAzimuth > 175 && azimuth < -175) {
       relativeAzimuth -= 360;
     }
+    return Math.max(-180, Math.min(180, relativeAzimuth));
+  }
+
+  private normalizeAzimuth(azimuth: number, currentDirection: number): number {
+    // Ensure currentDirection is within 0-360°
+    currentDirection = ((currentDirection % 360) + 360) % 360;
+
+    // Ensure azimuth is within ±180°
+    let relativeAzimuth = azimuth - currentDirection;
+    relativeAzimuth = this.wrapAzimuth(relativeAzimuth);
+    relativeAzimuth = this.smoothAzimuthGap(relativeAzimuth, azimuth);
 
     return relativeAzimuth;
   }
@@ -140,10 +179,15 @@ class CelestialBodies {
     observer: Astronomy.Observer,
     date: Date,
   ): [number, number, boolean] {
-    //Calculate equatorial coordinates first for the specific body, date and for observer location
+    /** Calculate equatorial coordinates first for the specific body, date and for observer location
+     *  Outputs right ascension (ra) and declination (dec) in degrees => necessary data for calculating horizontal coordinates
+     *  dec: positive: north of celestial equator; negative: south of celestial equator; range -90° to +90°; scalar value
+     *  ra: angle eastward along celestial equator; range 0° to 360°; similar to longitude but on celestial sphere; scalar value
+     */
     const equator = Astronomy.Equator(body, date, observer, false, true);
-    /** Azimuth measured from north 0° to east 90° degrees => we assume flat horizon, hence max rotation of 180°
-     *  Altitude in respect if object is above the horion line (positive values) or not
+    /** Calculates horizontal coordinates for a given equatorial coordinates (ra, dec) and observer location.
+     *  Altitude: angle in degrees above the horizon; range -90° to +90°; scalar value
+     *  Azimuth: angle in degrees along the horizon; range 0° to 360°; scalar value
      */
     const horizon = Astronomy.Horizon(
       date,
@@ -153,7 +197,6 @@ class CelestialBodies {
       "normal",
     );
 
-    //Normalize Azimuth according to compassHeading as compassHeading defines currentDirection
     const normalizedAzimuth = this.normalizeAzimuth(
       horizon.azimuth,
       this.currentDirection,
@@ -169,7 +212,72 @@ class CelestialBodies {
   }
 
   /** Calculation of path for a body, observer and date using data samples over time => builds a vertex array representing the path*/
-  private calculatePath72h(
+  private calculatePath24h(
+    body: Astronomy.Body,
+    observer: Astronomy.Observer,
+    date: Date,
+  ) {
+    //Simplified calculation with 24h path => down below calculation for path which includes previous and next day
+    const currentDayVertices: Vertex[] = [];
+    const coveredAngles = new Set<number>();
+
+    for (let minutes = 0; minutes < 1440; minutes += pathSamplingRate) {
+      const pathDate = new Date(date.getTime() + minutes * 60000);
+      try {
+        const equator = Astronomy.Equator(
+          body,
+          pathDate,
+          observer,
+          false,
+          true,
+        );
+        const horizon = Astronomy.Horizon(
+          pathDate,
+          observer,
+          equator.ra,
+          equator.dec,
+          "normal",
+        );
+        const normalizedAzimuth = this.normalizeAzimuth(
+          horizon.azimuth,
+          this.currentDirection,
+        );
+
+        const currentAngle = Math.round(normalizedAzimuth);
+        if (!coveredAngles.has(currentAngle)) {
+          coveredAngles.add(currentAngle);
+          const x = normalizedAzimuth / 90;
+          const y = horizon.altitude / 90;
+          const aboveHorizon = horizon.altitude >= 0 ? 1.0 : 0.4;
+
+          currentDayVertices.push({
+            x,
+            y,
+            aboveHorizon,
+            azimuth: normalizedAzimuth,
+          });
+        }
+      } catch (e) {
+        console.warn(
+          `Error calculating position for ${body} at ${pathDate.toISOString()} for observer at lat: ${observer.latitude}, lng: ${observer.longitude}: ${e}`,
+        );
+      }
+    }
+
+    currentDayVertices.sort((a, b) => a.azimuth - b.azimuth);
+
+    const vertices = currentDayVertices.flatMap((v) => [
+      v.x,
+      v.y,
+      v.aboveHorizon,
+    ]);
+
+    return {
+      pathVertices: new Float32Array(vertices),
+    };
+  }
+
+  private calculatePathCurrentPrevNextDay(
     body: Astronomy.Body,
     observer: Astronomy.Observer,
     date: Date,
@@ -177,10 +285,9 @@ class CelestialBodies {
     const currentDayVertices: Vertex[] = [];
     const prevAndNextDayVertices: Vertex[] = [];
     const coveredAngles = new Set();
-    const samplingRate = 2;
 
-    //Calculate Path for current day, sampling every 2 minutes
-    for (let minutes = 0; minutes < 1440; minutes += samplingRate) {
+    //Calculate Path for current day, sampling according to pathSamplingRate
+    for (let minutes = 0; minutes < 1440; minutes += pathSamplingRate) {
       const pathDate = new Date(date.getTime() + minutes * 60000);
       try {
         const equator = Astronomy.Equator(
@@ -226,15 +333,14 @@ class CelestialBodies {
       }
     }
 
-    //TODO: maybe remove => if date is fixed don't need it
-    //Calculate paths for previous (-1) and next day (+1)
+    //Calculate paths for previous (-1) and next day (+1) in order to have a smooth transition between days
     [-1, 1].forEach((dayOffset) => {
       const offsetDate = new Date(date);
       //offset the date in order to calculate path either for prev or next day
       offsetDate.setDate(offsetDate.getDate() + dayOffset);
 
       //sampling every 2 minutes over 24h period of the offset
-      for (let minutes = 0; minutes < 1440; minutes += samplingRate) {
+      for (let minutes = 0; minutes < 1440; minutes += pathSamplingRate) {
         const pathDate = new Date(offsetDate.getTime() + minutes * 60000);
         try {
           const equator = Astronomy.Equator(
@@ -261,8 +367,7 @@ class CelestialBodies {
           if (!coveredAngles.has(currentAngle)) {
             const x = normalizedAzimuth / 90;
             const y = horizon.altitude / 90;
-            //If path is aboveHorizon set visibility to 0.8 else to 0.2 => paths will be distinguishable from currentDayVertices
-            const aboveHorizon = horizon.altitude >= 0 ? 0.8 : 0.2;
+            const aboveHorizon = horizon.altitude >= 0 ? 1.0 : 0.4;
 
             prevAndNextDayVertices.push({
               x,
@@ -280,7 +385,7 @@ class CelestialBodies {
       }
     });
 
-    //Sort all paths for a smooth path
+    //Sort paths for a curved path
     const allVertices = [...prevAndNextDayVertices, ...currentDayVertices].sort(
       (a, b) => a.azimuth - b.azimuth,
     );
@@ -539,12 +644,12 @@ class CelestialBodies {
       this.currentDirection = currentDirection;
 
       //Calculate Sun and Moon Paths
-      const sunPathData = this.calculatePath72h(
+      const sunPathData = this.calculatePath24h(
         Astronomy.Body.Sun,
         observer,
         date,
       );
-      const moonPathData = this.calculatePath72h(
+      const moonPathData = this.calculatePath24h(
         Astronomy.Body.Moon,
         observer,
         date,
@@ -571,7 +676,123 @@ class CelestialBodies {
   public renderPosition() {
     if (!this.currentPositionKey) return;
     const cachedData = this.positionCache.get(this.currentPositionKey);
-    if (cachedData) this.drawPositionFromCache(cachedData);
+    if (cachedData) {
+      this.drawPositionFromCache(cachedData);
+    }
+  }
+
+  //Tracing
+  //Iterate over traces and draw intersection lines
+  private drawIntersectionLine(traces: Trace[]) {
+    if (!this.lineBuffer) {
+      console.warn("lineBuffer is null.");
+      return;
+    }
+
+    const intersectionLine = new Float32Array(4);
+    for (const trace of traces) {
+      intersectionLine[0] = trace.from[0];
+      intersectionLine[1] = trace.from[1];
+      intersectionLine[2] = trace.to[0];
+      intersectionLine[3] = trace.to[1];
+      this.drawObject(
+        this.lineBuffer,
+        intersectionLine,
+        [1.0, 0.0, 0.0],
+        this.gl.LINES,
+        [1, 1],
+        [0, 0],
+      );
+    }
+  }
+
+  //Generate key for tracing cache
+  private generateTracingKey = (lat: number, lng: number, date: Date) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = String(date.getFullYear());
+    const key = `${lat}-${lng}-${year}-${month}-${day}`;
+    return key;
+  };
+
+  //Calculate tracing lines for Sun over 24hour period, store 10 minute intervals, sunPosition and observer position
+  private calculateTracingLines(observer: Astronomy.Observer, date: Date) {
+    const traces: Trace[] = [];
+
+    for (let minutes = 0; minutes < 1440; minutes += tracingSamplingRate) {
+      const tracingDate = new Date(date.getTime() + minutes * 60000);
+
+      const sunPosition = this.calculatePosition(
+        Astronomy.Body.Sun,
+        observer,
+        tracingDate,
+      );
+
+      traces.push({
+        minute: minutes,
+        from: [sunPosition[0], sunPosition[1]],
+        to: [0, observer.height / this.maxElevation],
+      });
+    }
+
+    return traces;
+  }
+
+  //When center or date changes, update tracing line with correct elevation for center
+  public updateTracingLine(
+    lat: number,
+    lng: number,
+    date: Date,
+    elevation: number,
+  ) {
+    if (this.tracingCache.size > tracingCacheSize) {
+      const lastKey = this.currentTracingKey;
+      if (lastKey) {
+        const cachedDate = this.tracingCache.get(lastKey);
+        console.log("Clearing tracing cache...");
+        this.tracingCache.clear();
+        if (cachedDate) this.tracingCache.set(lastKey, cachedDate);
+      }
+    }
+
+    const key = this.generateTracingKey(lat, lng, date);
+
+    //cached data contains traces for 24h period for specific calendar date
+    if (!this.tracingCache.has(key)) {
+      const observer = new Astronomy.Observer(lat, lng, elevation);
+      const traces = this.calculateTracingLines(observer, date);
+      this.tracingCache.set(key, traces);
+    }
+
+    this.currentTracingKey = key;
+  }
+
+  //When time changes, get tracing line for specific time
+  public getTraceForTime(time: Date) {
+    if (!this.currentTracingKey) return;
+
+    const cachedData = this.tracingCache.get(this.currentTracingKey);
+    if (!cachedData) return;
+
+    const minutes = time.getHours() * 60 + time.getMinutes();
+
+    /** Find closest trace to the given time, if not found return [0, 0, 0, 0]; tracingSamplingRate is 10 minutes, divided by 2 gives +/- 5 minutes within the closes trace must be found */
+    this.currentTrace = cachedData.find(
+      (t) => Math.abs(t.minute - minutes) <= tracingSamplingRate / 2,
+    );
+
+    return new Float32Array([
+      this.currentTrace?.from[0] ?? 0,
+      this.currentTrace?.from[1] ?? 0,
+      this.currentTrace?.to[0] ?? 0,
+      this.currentTrace?.to[1] ?? 0,
+    ]);
+  }
+
+  //Render tracing line 24h period when existing in cache
+  public renderTracingLine() {
+    if (!this.currentTrace) return;
+    if (this.currentTrace) this.drawIntersectionLine([this.currentTrace]);
   }
 }
 
