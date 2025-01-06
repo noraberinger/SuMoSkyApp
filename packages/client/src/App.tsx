@@ -72,9 +72,14 @@ const App: React.FC = () => {
   /** For Marker functionality when accessed over SearchField.
    *  By default set to the position of Zurich. */
   const [markers, setMarkers] = useState<Marker[]>([
-    { id: self.crypto.randomUUID(), name: "Zurich", position: positionZurich },
+    {
+      id: self.crypto.randomUUID(),
+      name: "Zurich",
+      position: positionZurich,
+      searchLocation: positionZurich,
+    },
   ]);
-  const [center, setCenter] = useState<L.LatLngExpression>();
+  const [landmark, setLandmark] = useState<L.LatLngExpression>();
   const MAX_MARKER = 10;
 
   /** By default Date on Calendar is set to current date.
@@ -225,7 +230,7 @@ const App: React.FC = () => {
           >
             <SearchField
               map={mapRef.current}
-              setCenter={setCenter}
+              setCenter={setLandmark}
               setMarkers={setMarkers}
               maxMarkers={MAX_MARKER}
             />
@@ -267,15 +272,15 @@ const App: React.FC = () => {
           {/* Leaflet Map */}
           <LeafletMap
             mapRef={mapRef}
-            center={center}
+            landmark={landmark}
             markers={markers}
             setMarkers={setMarkers}
-            setCenter={setCenter}
+            setCenter={setLandmark}
           />
           {/* Sun/Moon Position on Leaflet Map */}
           <CelestialBodiesLeaflet
             mapRef={mapRef}
-            center={center}
+            landmark={landmark}
             date={selectedDate}
             time={sliderTime}
             showSun={showSun}
@@ -312,13 +317,13 @@ const App: React.FC = () => {
                 }}
               >
                 <DTLSave
-                  center={center}
+                  landmark={landmark}
                   date={selectedDate}
                   time={sliderTime}
                   setSavedPlans={setSavedPlans}
                 />
                 <DTLLoadDelete
-                  setCenter={setCenter}
+                  setCenter={setLandmark}
                   setSelectedDate={setSelectedDate}
                   setSliderTime={setSliderTime}
                   savedPlans={savedPlans}
@@ -381,7 +386,7 @@ const App: React.FC = () => {
             <>
               <TerrenderCanvas
                 config={clientConfig}
-                center={center}
+                landmark={landmark}
                 time={sliderTime}
                 date={selectedDate}
                 sliderElevation={sliderElevation}
@@ -413,6 +418,12 @@ const App: React.FC = () => {
                       bottom: 60,
                       right: "1em",
                       zIndex: 1500,
+                      border: "2px solid",
+                      borderColor: "grey.700",
+                      "&:hover": {
+                        boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.7)",
+                        transition: "all 0.2s ease-in-out",
+                      },
                     }}
                   >
                     <TuneIcon />
@@ -441,16 +452,16 @@ const App: React.FC = () => {
               {/* Spacer when DTL UI visible */}
               <Grid
                 size={{ xs: 12 }}
-                sx={{ height: isDTLVisible ? "6em" : "0.75em" }}
+                sx={{ height: isDTLVisible ? "6em" : "1.5em" }}
               />
               {/* UI Elevation/Visibility Sliders */}
               <Grid
                 size={{ xs: 2 }}
                 sx={{
-                  height: "60%",
                   paddingLeft: "3.5em",
-                  paddingTop: "0.75em",
-                  pointerEvents: "all",
+                  paddingTop: "0.8em",
+                  height: "60%",
+                  "& > *": { pointerEvents: "all" },
                 }}
               >
                 {showElevationSlider && !toggledTopDown && (
@@ -465,15 +476,15 @@ const App: React.FC = () => {
                 size={{ xs: 10 }}
                 sx={{
                   paddingRight: "3.5em",
-                  paddingTop: "0.75em",
-                  pointerEvents: "all",
+                  paddingTop: "0.8em",
+                  "& > *": { pointerEvents: "all" },
                 }}
               >
                 {showVisibilitySlider && !toggledTopDown && (
                   <VisibilitySlider
                     value={sliderVisibility}
                     onChange={setSliderVisibility}
-                    center={center}
+                    landmark={landmark}
                     selectedDate={selectedDate}
                     sliderTime={sliderTime}
                   />

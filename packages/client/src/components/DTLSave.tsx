@@ -6,14 +6,14 @@ import { BookmarkAdd } from "@mui/icons-material/";
 import { positiveActions } from "./Utils/ColorThemes";
 
 interface StorageHandlerProps {
-  center: L.LatLngExpression | undefined;
+  landmark: L.LatLngExpression | undefined;
   date: Date;
   time: number;
   setSavedPlans: React.Dispatch<React.SetStateAction<Plan[]>>;
 }
 
 const localStorageHandler = ({
-  center,
+  landmark: center,
   date,
   time,
   setSavedPlans,
@@ -71,7 +71,7 @@ const localStorageHandler = ({
  * Current DTL data will be stored in localstorage.
  */
 const DTLSave: React.FC<StorageHandlerProps> = ({
-  center,
+  landmark: center,
   date,
   time,
   setSavedPlans,
@@ -81,7 +81,7 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
   const setSnackbarStates = { openSnackbarDTL: setOpenSnackbarDTL };
 
   const { handleSaveDTL } = localStorageHandler({
-    center,
+    landmark: center,
     date,
     time,
     setSavedPlans,
@@ -100,6 +100,16 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
             handleSaveDTL();
           }}
           size="small"
+          sx={{
+            border: "2px solid",
+            borderColor: "grey.600",
+            boxShadow: 4,
+            "&:hover": {
+              boxShadow: 8,
+              transform: "scale(1.1)",
+              transition: "all 0.2s ease-in-out",
+            },
+          }}
         >
           <BookmarkAdd />
         </Fab>

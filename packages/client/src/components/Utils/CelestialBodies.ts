@@ -11,8 +11,9 @@ interface Vertex {
 }
 
 interface Trace {
-  minute: number;
-  from: [number, number];
+  date: Date;
+  sun: [number, number];
+  moon: [number, number];
   to: [number, number];
 }
 
@@ -119,16 +120,6 @@ class CelestialBodies {
         "shaderProgramInfo initialization failed. Check createShaders().",
       );
     }
-  }
-
-  //Screen space coordinates for intersection line are x: [-2, 2], y:[-1, 1]
-  private createIntersectionLine(
-    x_1: number,
-    y_1: number,
-    x_2: number,
-    y_2: number,
-  ): Float32Array {
-    return new Float32Array([x_1, y_1, x_2, y_2]);
   }
 
   //CircleVertices for Sun/Moon object
@@ -408,7 +399,7 @@ class CelestialBodies {
   private drawObject(
     buffer: WebGLBuffer,
     vertices: Float32Array | null,
-    color: [number, number, number],
+    color: [number, number, number, number],
     mode: number,
     scale: [number, number] = [1, 1],
     translation: [number, number] = [0, 0],
@@ -438,7 +429,20 @@ class CelestialBodies {
       : this.gl.getBufferParameter(this.gl.ARRAY_BUFFER, this.gl.BUFFER_SIZE) /
         8;
 
-    if (divisor === 3) {
+    if (mode === this.gl.TRIANGLES) {
+      this.gl.vertexAttribPointer(
+        this.positionLocation,
+        2,
+        this.gl.FLOAT,
+        false,
+        0,
+        0,
+      );
+      this.gl.uniform4fv(this.colorLocation, color);
+      this.gl.uniform2fv(this.scaleLocation, scale);
+      this.gl.uniform2fv(this.translationLocation, translation);
+      this.gl.drawArrays(mode, 0, 3);
+    } else if (divisor === 3) {
       this.gl.vertexAttribPointer(
         this.positionLocation,
         2,
@@ -457,8 +461,9 @@ class CelestialBodies {
             color[0] * alpha,
             color[1] * alpha,
             color[2] * alpha,
+            1,
           ];
-          this.gl.uniform3fv(this.colorLocation, alphaColor);
+          this.gl.uniform4fv(this.colorLocation, alphaColor);
           this.gl.drawArrays(mode, i, 2);
         } else {
           console.warn("Vertices is null.");
@@ -473,7 +478,7 @@ class CelestialBodies {
         0,
         0,
       );
-      this.gl.uniform3fv(this.colorLocation, color);
+      this.gl.uniform4fv(this.colorLocation, color);
       this.gl.uniform2fv(this.scaleLocation, scale);
       this.gl.uniform2fv(this.translationLocation, translation);
       this.gl.drawArrays(mode, 0, vertexAmount);
@@ -493,7 +498,7 @@ class CelestialBodies {
       this.drawObject(
         this.circleBuffer,
         null,
-        sun[2] ? [1.0, 1.0, 0.0] : [0.8, 0.8, 0.0],
+        sun[2] ? [1.0, 1.0, 0.0, 1.0] : [0.8, 0.8, 0.0, 1.0],
         this.gl.TRIANGLE_FAN,
         [0.05, 0.05],
         [sun[0], sun[1]],
@@ -502,7 +507,7 @@ class CelestialBodies {
       this.drawObject(
         this.circleBuffer,
         null,
-        moon[2] ? [0.9, 0.9, 0.9] : [0.7, 0.7, 0.7],
+        moon[2] ? [0.9, 0.9, 0.9, 1.0] : [0.7, 0.7, 0.7, 1.0],
         this.gl.TRIANGLE_FAN,
         [0.03, 0.03],
         [moon[0], moon[1]],
@@ -521,7 +526,7 @@ class CelestialBodies {
       this.drawObject(
         this.pathBuffer,
         data.sunPath,
-        [1.0, 0.8, 0.0],
+        [1.0, 0.8, 0.0, 1.0],
         this.gl.LINE_STRIP,
         [1, 1],
         [0, 0],
@@ -529,7 +534,7 @@ class CelestialBodies {
       this.drawObject(
         this.pathBuffer,
         data.moonPath,
-        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0, 1.0],
         this.gl.LINE_STRIP,
         [1, 1],
         [0, 0],
@@ -574,6 +579,7 @@ class CelestialBodies {
     lng: number,
     dateTime: Date,
     currentDirection: number,
+    elevation: number,
   ) {
     /**Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
      * Keeping lastKey and restoring it after cache is cleared in order to minimize unnecessary recalculations
@@ -592,7 +598,7 @@ class CelestialBodies {
 
     // Calculate if key not in cache
     if (!this.positionCache.has(key)) {
-      const observer = new Astronomy.Observer(lat, lng, 0);
+      const observer = new Astronomy.Observer(lat, lng, elevation);
       this.currentDirection = currentDirection;
 
       // Get current Sun and Moon position
@@ -622,6 +628,7 @@ class CelestialBodies {
     lng: number,
     date: Date,
     currentDirection: number,
+    elevation: number,
   ) {
     /**Memory management: clear cache when exceeding certain size in order to keep memory retrieval efficient + no infinite memory growth
      * Keeping lastKey and restoring it after cache is cleared in order to minimize unnecessary recalculations
@@ -640,7 +647,7 @@ class CelestialBodies {
 
     // Calculate if key not in cache
     if (!this.pathCache.has(key)) {
-      const observer = new Astronomy.Observer(lat, lng, 0);
+      const observer = new Astronomy.Observer(lat, lng, elevation);
       this.currentDirection = currentDirection;
 
       //Calculate Sun and Moon Paths
@@ -683,27 +690,49 @@ class CelestialBodies {
 
   //Tracing
   //Iterate over traces and draw intersection lines
-  private drawIntersectionLine(traces: Trace[]) {
+  private drawIntersectionLine() {
     if (!this.lineBuffer) {
       console.warn("lineBuffer is null.");
       return;
     }
 
+    /** 
     const intersectionLine = new Float32Array(4);
     for (const trace of traces) {
-      intersectionLine[0] = trace.from[0];
-      intersectionLine[1] = trace.from[1];
+      intersectionLine[0] = trace.sun[0];
+      intersectionLine[1] = trace.sun[1];
       intersectionLine[2] = trace.to[0];
       intersectionLine[3] = trace.to[1];
       this.drawObject(
         this.lineBuffer,
         intersectionLine,
         [1.0, 0.0, 0.0],
-        this.gl.LINES,
+        this.gl.TRIANGLES,
         [1, 1],
         [0, 0],
       );
-    }
+      intersectionLine[0] = trace.moon[0];
+      intersectionLine[1] = trace.moon[1];
+      intersectionLine[2] = trace.to[0];
+      intersectionLine[3] = trace.to[1];
+      this.drawObject(
+        this.lineBuffer,
+        intersectionLine,
+        [0.0, 1.0, 0.0],
+        this.gl.TRIANGLES,
+        [1, 1],
+        [0, 0],
+      )    };*/
+    const triangleVertices = new Float32Array([0.0, -0.25, -1, -1, 1, -1]);
+
+    this.drawObject(
+      this.lineBuffer,
+      triangleVertices,
+      [0.0, 1.0, 0.0, 0.1],
+      this.gl.TRIANGLES,
+      [1, 1],
+      [0, 0],
+    );
   }
 
   //Generate key for tracing cache
@@ -719,8 +748,11 @@ class CelestialBodies {
   private calculateTracingLines(observer: Astronomy.Observer, date: Date) {
     const traces: Trace[] = [];
 
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
     for (let minutes = 0; minutes < 1440; minutes += tracingSamplingRate) {
-      const tracingDate = new Date(date.getTime() + minutes * 60000);
+      const tracingDate = new Date(startOfDay.getTime() + minutes * 60000);
 
       const sunPosition = this.calculatePosition(
         Astronomy.Body.Sun,
@@ -728,11 +760,19 @@ class CelestialBodies {
         tracingDate,
       );
 
+      const moonPosition = this.calculatePosition(
+        Astronomy.Body.Moon,
+        observer,
+        tracingDate,
+      );
+
       traces.push({
-        minute: minutes,
-        from: [sunPosition[0], sunPosition[1]],
-        to: [0, observer.height / this.maxElevation],
+        date: tracingDate,
+        sun: [sunPosition[0], sunPosition[1]],
+        moon: [moonPosition[0], moonPosition[1]],
+        to: [0, -0.5],
       });
+      console.log("traces", traces);
     }
 
     return traces;
@@ -774,16 +814,20 @@ class CelestialBodies {
     const cachedData = this.tracingCache.get(this.currentTracingKey);
     if (!cachedData) return;
 
-    const minutes = time.getHours() * 60 + time.getMinutes();
-
-    /** Find closest trace to the given time, if not found return [0, 0, 0, 0]; tracingSamplingRate is 10 minutes, divided by 2 gives +/- 5 minutes within the closes trace must be found */
-    this.currentTrace = cachedData.find(
-      (t) => Math.abs(t.minute - minutes) <= tracingSamplingRate / 2,
-    );
+    /** Find closest trace to the given time, if not found return [0, 0, 0, 0]*/
+    this.currentTrace = cachedData.find((t) => {
+      const traceTime = t.date;
+      return (
+        traceTime.getHours() === time.getHours() &&
+        traceTime.getMinutes() === time.getMinutes()
+      );
+    });
 
     return new Float32Array([
-      this.currentTrace?.from[0] ?? 0,
-      this.currentTrace?.from[1] ?? 0,
+      this.currentTrace?.sun[0] ?? 0,
+      this.currentTrace?.sun[1] ?? 0,
+      this.currentTrace?.moon[0] ?? 0,
+      this.currentTrace?.moon[1] ?? 0,
       this.currentTrace?.to[0] ?? 0,
       this.currentTrace?.to[1] ?? 0,
     ]);
@@ -791,8 +835,8 @@ class CelestialBodies {
 
   //Render tracing line 24h period when existing in cache
   public renderTracingLine() {
-    if (!this.currentTrace) return;
-    if (this.currentTrace) this.drawIntersectionLine([this.currentTrace]);
+    if (!this.currentTracingKey || !this.currentTrace) return;
+    if (this.currentTrace) this.drawIntersectionLine();
   }
 }
 

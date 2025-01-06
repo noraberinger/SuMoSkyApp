@@ -138,6 +138,16 @@ const DTLLoadDelete: React.FC<DTLLoadDeleteProps> = ({
           aria-label="showPlans"
           onClick={toggleTable}
           size="small"
+          sx={{
+            border: "2px solid",
+            borderColor: "grey.600",
+            boxShadow: 4,
+            "&:hover": {
+              boxShadow: 8,
+              transform: "scale(1.1)",
+              transition: "all 0.2s ease-in-out",
+            },
+          }}
         >
           <Bookmark />
         </Fab>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Camera from "terrender-core/src/Utils/Camera";
+import { normalizeDegrees } from "./Utils/Calc";
 
 interface CompassProps {
   camera: Camera | undefined;
@@ -72,21 +73,29 @@ const Compass: React.FC<CompassProps> = ({
   );
 
   //TODO fix rotation, radius def wrong + rotation, currently north is south and vice versa after 1 full rotation
-  const calculateTopDownCamTarget = useCallback(
-    (direction: number, position: number[], target: number[]) => {
-      const radius = position[2];
-      const angleInRadians = (direction * Math.PI) / 180;
-      console.log("radius topDown", radius);
+  const calculateTopDownCamTarget = useCallback((direction: number) => {
+    const angleInRadians = (normalizeDegrees(direction) * Math.PI) / 180;
 
-      // Keep target fixed, move camera position
-      const newPosX = target[0] + radius * Math.sin(angleInRadians);
-      const newPosY = target[1] + radius * Math.cos(angleInRadians);
-      const newPosZ = position[2]; // Maintain height
+    /*
+    Math.sin(rotation),
+        1,
+        Math.cos(rotation)
+        */
+    // TODO fix this
+    if (direction >= 90 && direction < 270) {
+      return [Math.sin(angleInRadians), 1, Math.abs(Math.cos(angleInRadians))];
+    } else {
+      return [Math.abs(Math.sin(angleInRadians)), 1, Math.cos(angleInRadians)];
+    }
 
-      return [newPosX, newPosY, newPosZ];
-    },
-    [],
-  );
+    // Normalize to ensure consistent behavior
+    /*
+    const length = Math.sqrt(up[0] * up[0] + up[1] * up[1] + up[2] * up[2]);
+    up[0] /= length;
+    up[1] /= length;
+    up[2] /= length;
+    */
+  }, []);
 
   const startDrag = useCallback(
     (event: MouseEvent | TouchEvent) => {
@@ -128,12 +137,8 @@ const Compass: React.FC<CompassProps> = ({
           camera.changeCamPosition(camera.position, newTarget);
         } else if (camera && topDown) {
           updateCompass(newDirection);
-          const newPosition = calculateTopDownCamTarget(
-            newDirection,
-            camera.position,
-            camera.target,
-          );
-          camera.changeCamPosition(newPosition, camera.target);
+          const up = calculateTopDownCamTarget(newDirection);
+          camera.lookAt(camera.position, camera.target, up);
         }
       }
     },

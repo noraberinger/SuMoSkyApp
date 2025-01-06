@@ -1,13 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import SearchIcon from "@mui/icons-material/Search";
-import { TextField, InputAdornment, Snackbar, Alert } from "@mui/material";
-import "leaflet-control-geocoder";
+import {
+  Autocomplete,
+  TextField,
+  InputAdornment,
+  Snackbar,
+  Alert,
+} from "@mui/material";
 import L from "leaflet";
 import { Marker } from "./LeafletMap";
-import { convertLatLngToCoords } from "./Utils/Calc";
+import { OpenStreetMapProvider } from "leaflet-geosearch";
 
-interface GeocodeResultType {
-  center: L.LatLng;
+interface SearchOption {
+  label: string;
+  value: {
+    x: number;
+    y: number;
+  };
 }
 
 interface SearchFieldProps {
@@ -19,16 +28,22 @@ interface SearchFieldProps {
   maxMarkers: number;
 }
 
-/**
- *
- * @returns SearchField
- * Allows user to search for a location known to OpenStreetMap.
- * Makes use of Nominatim in order to Geocode a specified location:
- * * https://nominatim.org/
- * Makes use of @mui Text Field and SearchIcon:
- * * https://mui.com/material-ui/react-text-field/
- * * https://mui.com/material-ui/material-icons/?query=search+
- */
+const useDebounce = <T = unknown,>(value: T, delayMs: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delayMs);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [value, delayMs]);
+
+  return debouncedValue;
+};
+
 const SearchField: React.FC<SearchFieldProps> = ({
   map,
   setCenter,
@@ -36,102 +51,105 @@ const SearchField: React.FC<SearchFieldProps> = ({
   maxMarkers,
 }) => {
   const [openSnackbarMaxArray, setOpenSnackbarMaxArray] = useState(false);
+  const [options, setOptions] = useState<SearchOption[]>([]);
+  const provider = useMemo(() => new OpenStreetMapProvider(), []);
+  const [inputValue, setInputValue] = useState<string>("");
+
+  const debouncedInput = useDebounce(inputValue, 300);
+
+  useEffect(() => {
+    if (debouncedInput) {
+      const searchLocations = async (input: string) => {
+        const results = await provider.search({ query: input });
+        setOptions(
+          results.map((result) => ({
+            label: result.label,
+            value: { x: result.x, y: result.y },
+          })),
+        );
+      };
+      searchLocations(debouncedInput);
+    }
+  }, [debouncedInput, provider]);
 
   const handleSnackbarClose = () => {
     setOpenSnackbarMaxArray(false);
   };
 
-  const handleSearchInput = (input: string) => {
-    if (!input || !map) return;
+  const handleOptionSelect = (option: SearchOption) => {
+    if (!option || !map) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const geocoder = (L.Control as any).Geocoder.nominatim();
-
-    if (!geocoder) {
-      console.error("Geocoder not available");
+    if (!("value" in option)) {
+      console.warn("Invalid option format");
       return;
     }
 
-    geocoder.geocode(input, function (results: GeocodeResultType[]) {
-      console.log("handleSearchInput results", results);
-      if (results && results.length > 0) {
-        const latLng = results[0].center;
-        /** Setting the map to the specified location. */
-        setCenter(latLng);
-        /** TypeCheck to safeguard LatLngExpression */
-        const typeCheckLatLng = (
-          marker: Marker,
-        ): { lat: number; lng: number } => {
-          const markerPos = marker.position;
-          const { lat, lng } = convertLatLngToCoords(markerPos);
-          return { lat, lng };
-        };
-        /** Generating the new Marker
-         *  Additionally checking if the Marker is already contained in Marker[] => if true the marker is not added to the array.
-         */
-        setMarkers((prevMarkers) => {
-          /** Informing user maximum amount of markers reached. */
-          if (prevMarkers.length >= maxMarkers) {
-            setOpenSnackbarMaxArray(true);
-            return prevMarkers;
-          }
-          const newMarker = {
-            id: self.crypto.randomUUID(),
-            name: input,
-            position: latLng,
-          };
-          const isDuplicate = prevMarkers.some((marker) => {
-            const convertedLatLng = typeCheckLatLng(marker);
-            const newMarkerLat = newMarker.position.lat;
-            const newMarkerLng = newMarker.position.lng;
-            /** Comparison of prevMarkers lat/lng and new Marker lat/lng*/
-            return (
-              convertedLatLng.lat === newMarkerLat &&
-              convertedLatLng.lng === newMarkerLng
-            );
-          });
-          /** If the previous check returns true the prevMarkers array is returned => no change. */
-          if (isDuplicate) {
-            console.warn("Location already in Markers[]");
-            return prevMarkers;
-          } else {
-            /** Else add newMarker to prevMarkers. */
-            return [...prevMarkers, newMarker];
-          }
-        });
-      } else {
-        console.error("No geocoding result found for the input.");
+    const latLng = L.latLng(option.value.y, option.value.x);
+    setCenter(latLng);
+
+    setMarkers((prevMarkers) => {
+      if (prevMarkers.length >= maxMarkers) {
+        setOpenSnackbarMaxArray(true);
+        return prevMarkers;
       }
+
+      const newMarker = {
+        id: self.crypto.randomUUID(),
+        name: option.label,
+        position: latLng,
+        searchLocation: latLng,
+      };
+
+      const isDuplicate = prevMarkers.some(
+        (marker) => marker.name.toLowerCase() === newMarker.name.toLowerCase(),
+      );
+
+      return isDuplicate ? prevMarkers : [...prevMarkers, newMarker];
     });
   };
 
   return (
     <div style={{ paddingLeft: "0.5em" }}>
-      <TextField
-        fullWidth
-        sx={(theme) => ({
-          "& .MuiInputBase-root": {
-            backgroundColor: theme.palette.primary.light,
-          },
-        })}
-        placeholder="Search Location"
-        onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
-          console.log(e.target instanceof HTMLInputElement && e.target.value);
-          if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
-            e.target.blur();
-            handleSearchInput(e.target.value);
+      <Autocomplete
+        freeSolo
+        options={options}
+        inputValue={inputValue}
+        onInputChange={(_, newValue) => {
+          setInputValue(newValue);
+        }}
+        getOptionLabel={(option) =>
+          typeof option === "string" ? option : option.label
+        }
+        onChange={(e, option) => {
+          if (option && typeof option !== "string" && "value" in option) {
+            if (e.target instanceof HTMLInputElement) e.target.blur();
+            handleOptionSelect(option);
           }
         }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                {" "}
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          },
-        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            fullWidth
+            placeholder="Search your landmark"
+            sx={(theme) => ({
+              "& .MuiInputBase-root": {
+                backgroundColor: theme.palette.primary.light,
+              },
+            })}
+            slotProps={{
+              inputLabel: params.InputLabelProps,
+              htmlInput: params.inputProps,
+              input: {
+                ...params.InputProps,
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        )}
       />
       <Snackbar open={openSnackbarMaxArray} onClose={handleSnackbarClose}>
         <Alert

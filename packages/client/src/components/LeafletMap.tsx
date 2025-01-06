@@ -6,6 +6,7 @@ import {
   TileLayer,
   ZoomControl,
   useMap,
+  AttributionControl,
 } from "react-leaflet";
 import L, { LatLngExpression } from "leaflet";
 import { Button, Snackbar, ThemeProvider, Alert } from "@mui/material";
@@ -17,11 +18,12 @@ export type Marker = {
   id: string;
   name: string;
   position: L.LatLngExpression;
+  searchLocation: L.LatLngExpression;
 };
 
 interface LeafletMapSetterProps {
   mapRef: React.MutableRefObject<L.Map | null>;
-  center?: L.LatLngExpression;
+  landmark?: L.LatLngExpression;
   setCenter: React.Dispatch<React.SetStateAction<LatLngExpression | undefined>>;
   markers: Marker[];
 }
@@ -33,7 +35,7 @@ interface LeafletMapProps extends LeafletMapSetterProps {
 /** Setting the mapRef.current to the map object, making the map accessible from other components.  */
 const MapSetter = ({
   mapRef,
-  center,
+  landmark: center,
   setCenter,
   markers,
 }: LeafletMapSetterProps) => {
@@ -91,7 +93,7 @@ const zoom = (
  */
 const LeafletMap: React.FC<LeafletMapProps> = ({
   mapRef,
-  center,
+  landmark: center,
   markers,
   setCenter,
   setMarkers,
@@ -116,14 +118,22 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
   const handleMarkerClick = (
     markerId: string,
     markerPos: L.LatLngExpression,
+    searchLocation: L.LatLngExpression,
   ) => {
     if (inDeletionMode) {
       deleteMarker(markerId);
     } else {
+      setMarkers((prevMarkers) =>
+        prevMarkers.map((m) =>
+          m.id === markerId ? { ...m, position: m.searchLocation } : m,
+        ),
+      );
+
       setOpenSnackbarGoLocation(true);
-      setCenter(markerPos);
-      if (markerPos === center) {
-        zoom(markerPos, mapRef);
+      setCenter(searchLocation);
+
+      if (searchLocation === center) {
+        zoom(searchLocation, mapRef);
       }
     }
   };
@@ -138,65 +148,95 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       zoom={13}
       zoomControl={false}
       scrollWheelZoom={true}
+      attributionControl={false}
     >
       {/* Map Hooks */}
       <MapSetter
         mapRef={mapRef}
-        center={center}
+        landmark={center}
         setCenter={setCenter}
         markers={markers}
       />
-      <LayersControl position="bottomright">
-        {/* Base Layers */}
-        <LayersControl.BaseLayer checked name="World Imagery">
-          <TileLayer
-            attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          />
-        </LayersControl.BaseLayer>
-        <LayersControl.BaseLayer checked name="OpenStreetMap">
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://tile.osm.ch/switzerland/{z}/{x}/{y}.png"
-          />
-        </LayersControl.BaseLayer>
-        {/* Markers => Input from SearchField */}
-        {markers.map((marker) => (
-          <LayersControl.Overlay key={marker.id} name={marker.name} checked>
-            <Marker
-              position={marker.position}
-              interactive={true}
-              eventHandlers={{
-                click: () => {
-                  handleMarkerClick(marker.id, marker.position);
-                },
-              }}
-            ></Marker>
-          </LayersControl.Overlay>
-        ))}
-      </LayersControl>
-      <ZoomControl position="bottomleft" />
-      {/* Deletion of Marker */}
-      <ThemeProvider theme={functionalities}>
-        <Button
-          variant="contained"
-          color="secondary"
-          onClick={() => {
-            setDeletionMode(!inDeletionMode);
-            if (!inDeletionMode) setOpenSnackbarDel(true);
-          }}
-          sx={{
-            position: "absolute",
-            zIndex: 1000,
-            bottom: "0.75em",
-            right: "1em",
-          }}
-          size="small"
-        >
-          {inDeletionMode ? "Cancel Delete" : "Delete "}
-          <MarkerIcon />
-        </Button>
-      </ThemeProvider>
+      {/* Attribution */}
+      <AttributionControl position="bottomleft" prefix={false} />
+      <div
+        style={{
+          position: "absolute",
+          bottom: "0.5em",
+          right: "0.9em",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.25em",
+          zIndex: 1000,
+        }}
+      >
+        <LayersControl position="bottomright">
+          {/* Base Layers */}
+          <LayersControl.BaseLayer checked name="World Imagery">
+            <TileLayer
+              attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer checked name="OpenStreetMap">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://tile.osm.ch/switzerland/{z}/{x}/{y}.png"
+            />
+          </LayersControl.BaseLayer>
+          {/* Markers => Input from SearchField, as well as from DragEndEvent */}
+          {markers.map((marker) => (
+            <LayersControl.Overlay
+              key={marker.id}
+              name={marker.name}
+              checked={true}
+            >
+              <Marker
+                key={`${marker.id}-${JSON.stringify(marker.position)}`}
+                position={marker.position}
+                interactive={true}
+                draggable={true}
+                eventHandlers={{
+                  click: () => {
+                    handleMarkerClick(
+                      marker.id,
+                      marker.position,
+                      marker.searchLocation,
+                    );
+                  },
+                  dragend: (e) => {
+                    const newPos = e.target.getLatLng();
+                    setMarkers((prevMarkers) =>
+                      prevMarkers.map((m) =>
+                        m.id === marker.id
+                          ? { ...m, position: [newPos.lat, newPos.lng] }
+                          : m,
+                      ),
+                    );
+                    setCenter([newPos.lat, newPos.lng]);
+                  },
+                }}
+              ></Marker>
+            </LayersControl.Overlay>
+          ))}
+        </LayersControl>
+        <ZoomControl position="bottomleft" />
+        {/* Deletion of Marker */}
+        <ThemeProvider theme={functionalities}>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => {
+              setDeletionMode(!inDeletionMode);
+              if (!inDeletionMode) setOpenSnackbarDel(true);
+            }}
+            size="small"
+          >
+            {inDeletionMode ? "Cancel Delete" : "Delete "}
+            <MarkerIcon />
+          </Button>
+        </ThemeProvider>
+      </div>
       <Snackbar open={openSnackbarDel} onClose={triggerSnackbarClose}>
         <Alert
           onClose={triggerSnackbarClose}

@@ -1,15 +1,43 @@
 import React, { useCallback } from "react";
+import SunCalc from "suncalc";
 import { useRef, useEffect, useState, useMemo } from "react";
 import { Terrender, StandardInputHandler } from "terrender-core";
 import Button from "@mui/material/Button";
 //import TextField from "@mui/material/TextField";
 import L from "leaflet";
 import SkyQuadBlended from "./Utils/SkyQuadBlended";
-import { convertDateTime, convertLatLngToCoords } from "./Utils/Calc";
+import {
+  convertDateTime,
+  convertLatLngToCoords,
+  calculateTriangleLegs,
+  toDeg,
+  translateCoords,
+  normalizeDegrees,
+} from "./Utils/Calc";
 import { ThemeProvider } from "@mui/material";
 import { functionalities } from "./Utils/ColorThemes";
 import Compass from "./Compass";
 import CelestialBodies from "./Utils/CelestialBodies";
+import Tracing from "./Utils/Tracing";
+
+const getSunAngles = (
+  landmark: { lat: number; lng: number },
+  start: Date,
+  end: Date,
+) => {
+  //Get Azimuth using suncalc, this gives use the direction of the body in horizontal plane (horizontal angle)
+  //t-n'
+  const startAnglesSun = SunCalc.getPosition(start, landmark.lat, landmark.lng);
+  //t+n'
+  const endAnglesSun = SunCalc.getPosition(end, landmark.lat, landmark.lng);
+
+  return [
+    startAnglesSun.azimuth,
+    endAnglesSun.azimuth,
+    startAnglesSun.altitude,
+    endAnglesSun.altitude,
+  ];
+};
 
 export interface ClientConfig {
   tileSideLength?: number;
@@ -40,7 +68,7 @@ export interface ClientConfig {
 
 interface TerrenderCanvasProps {
   config: ClientConfig;
-  center?: L.LatLngExpression;
+  landmark?: L.LatLngExpression;
   time: number;
   date: Date;
   sliderElevation: number;
@@ -69,8 +97,8 @@ class CustomTerrender extends Terrender {
   };
 }
 
-/** Without this zCoord of Camera would be at Horizon line => acts as a proportional offset */
-const camHeightMultiplier = 3.5;
+/** When this zCoord is 1 Camera is at Horizon line => acts as a proportional offset */
+const camHeightMultiplier = 1;
 
 /**
  * @returns TerrenderCanvas
@@ -79,7 +107,7 @@ const camHeightMultiplier = 3.5;
  */
 const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   config,
-  center,
+  landmark: center,
   time,
   date,
   sliderElevation,
@@ -109,17 +137,27 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   /** References for WebGL Objects, drawn using function drawSky */
   const skyquadRef = useRef<SkyQuadBlended | null>(null);
   const celestialBodiesRef = useRef<CelestialBodies | null>(null);
+  const tracingRef = useRef<Tracing | null>(null);
   /** Compass direction */
   const [currentDirection, setCurrentDirection] = useState<number>(0);
 
   /** Memo calculations for date, time, lat, lng */
-  const latLngToCoordsMemo = useMemo(() => {
+  const landmarkToCoordMemo = useMemo(() => {
     if (center) {
       return convertLatLngToCoords(center);
     }
     //return default if no center provided
     return { lat: 0, lng: 0 };
   }, [center]);
+
+  const landmarkElevationMemo = useMemo(() => {
+    if (!center || !terrenderRef.current || !didInitialDraw) return 0;
+    const { lat, lng } = convertLatLngToCoords(center);
+    const elevation = terrenderRef.current
+      .getQuadTree()
+      .getHeightValue(lng, lat);
+    return elevation;
+  }, [center, terrenderRef, didInitialDraw]);
 
   const dateTimeMemo = useMemo(() => {
     if (date && time) {
@@ -129,6 +167,151 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     //return default now if no time provided
     return new Date();
   }, [date, time]);
+
+  const tracingCoordsSun = useMemo(() => {
+    /*
+    const tenMinSunAzimuths = [-30, -20, -10, 0, 10, 20].map((timeDelta) => {
+      return getSunAzimuths(
+        new Date(dateTimeMemo.getTime() + timeDelta * 60000),
+        new Date(dateTimeMemo.getTime() + timeDelta + 10 * 60000),
+      );
+    });
+
+    const combinedCoords = tenMinSunAzimuths.map((sunAzimuths, index) => {
+      const coords = [
+        [
+          landmarkToCoordMemo.lng,
+          landmarkToCoordMemo.lat,
+          landmarkElevationMemo * 0.000025 + 1,
+        ],
+        //Sun azimuth at t+n'
+        [
+          ...translateCoords(
+            landmarkToCoordMemo.lng,
+            landmarkToCoordMemo.lat,
+            500,
+            toDeg(sunAzimuths[1]),
+          ),
+          0,
+        ],
+        //Sun azimuth at t-n'
+        [
+          ...translateCoords(
+            landmarkToCoordMemo.lng,
+            landmarkToCoordMemo.lat,
+            500,
+            toDeg(sunAzimuths[0]),
+          ),
+          0,
+        ],
+        [
+          landmarkToCoordMemo.lng,
+          landmarkToCoordMemo.lat,
+          landmarkElevationMemo * 0.000025,
+        ],
+      ];
+      return coords;
+    });
+
+    return combinedCoords;
+    */
+
+    const sunAzimuths = getSunAngles(
+      landmarkToCoordMemo,
+      new Date(dateTimeMemo.getTime() - 30 * 60000),
+      new Date(dateTimeMemo.getTime() + 30 * 60000),
+    );
+
+    console.log("azimuth before", toDeg(sunAzimuths[1]));
+    console.log("azimuth after", normalizeDegrees(toDeg(sunAzimuths[1]) + 180));
+    //Angles are in radians due to suncalc
+    return [
+      [
+        landmarkToCoordMemo.lng,
+        landmarkToCoordMemo.lat,
+        (landmarkElevationMemo + 1) * 0.000025,
+      ], // get sun position TOOD => altitude vector => altitude angle
+      //Sun azimuth at t+n'
+      [
+        ...translateCoords(
+          landmarkToCoordMemo.lng,
+          landmarkToCoordMemo.lat,
+          500,
+          toDeg(sunAzimuths[1]),
+        ),
+        0,
+      ],
+      //Sun azimuth at t-n'
+      [
+        ...translateCoords(
+          landmarkToCoordMemo.lng,
+          landmarkToCoordMemo.lat,
+          500,
+          toDeg(sunAzimuths[0]),
+        ),
+        0,
+      ],
+      [
+        landmarkToCoordMemo.lng,
+        landmarkToCoordMemo.lat,
+        landmarkElevationMemo * 0.000025,
+      ],
+    ];
+  }, [dateTimeMemo, landmarkToCoordMemo, landmarkElevationMemo]);
+
+  /** Calculating average position between time-30' and t+30' for the Moon */
+  const landmarkToMoonAzimuth = useMemo(() => {
+    //Get Azimuth using suncalc, this gives use the direction of the body in horizontal plane (horizontal angle); direction from landmark to body
+    const startAzimuthMoon = SunCalc.getMoonPosition(
+      new Date(dateTimeMemo.getTime() - 30 * 60000),
+      landmarkToCoordMemo.lat,
+      landmarkToCoordMemo.lng,
+    );
+    const endAzimuthMoon = SunCalc.getMoonPosition(
+      new Date(dateTimeMemo.getTime() + 30 * 60000),
+      landmarkToCoordMemo.lat,
+      landmarkToCoordMemo.lng,
+    );
+
+    return [endAzimuthMoon.azimuth, startAzimuthMoon.azimuth];
+  }, [dateTimeMemo, landmarkToCoordMemo.lat, landmarkToCoordMemo.lng]);
+
+  /** 
+  const tracingCoordsMoon = useMemo(
+    () =>
+      translateCoords(
+        landmarkToCoordMemo.lat,
+        landmarkToCoordMemo.lng,
+        3, // km TODO user settable => visibiliy sider, text field
+        toDeg(landmarkToMoonAzimuth),
+      ),
+    [landmarkToCoordMemo, landmarkToMoonAzimuth],
+  );*/
+
+  const tracingCoordsMoon = useMemo(() => {
+    //Angles are in radians due to suncalc
+    return [
+      [0, 0, 0], // get moon position TOOD
+      ...calculateTriangleLegs(
+        [
+          landmarkToCoordMemo.lat,
+          landmarkToCoordMemo.lng,
+          landmarkElevationMemo,
+        ],
+        landmarkToMoonAzimuth[0],
+        landmarkToMoonAzimuth[1],
+        1,
+      ),
+      [landmarkToCoordMemo.lat, landmarkToCoordMemo.lng, landmarkElevationMemo],
+    ];
+  }, [
+    landmarkElevationMemo,
+    landmarkToCoordMemo.lat,
+    landmarkToCoordMemo.lng,
+    landmarkToMoonAzimuth,
+  ]);
+
+  // TODO button to toggle between center & compass | tracingCoords as center & tracingMiddleAngle-180 as heading
 
   //Helper function setting setShouldRedrawCallback in Terrender
   const forceRender = useCallback(() => {
@@ -152,15 +335,14 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     }
   }, [didInitialDraw]);
 
-  /** Draw all elements except terrender => terrender will be drawn after setPreDrawCallback => drawCustom(drawSky) */
+  /** Draw all elements except terrender => terrender will be drawn after setPreDrawCallback => drawCustom(drawSky) 
   const drawSky = useCallback((didDraw: boolean) => {
     if (didDraw && skyquadRef.current && celestialBodiesRef.current) {
       skyquadRef.current.render();
       celestialBodiesRef.current.renderPath();
       celestialBodiesRef.current.renderPosition();
-      celestialBodiesRef.current.renderTracingLine();
     }
-  }, []);
+  }, []);*/
 
   //Set up canvas
   useEffect(() => {
@@ -190,11 +372,17 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       );
       skyquadRef.current = new SkyQuadBlended(gl);
       celestialBodiesRef.current = new CelestialBodies(gl);
+      tracingRef.current = new Tracing(gl, terrenderRef.current.getCamera());
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
       terrenderRef.current.setEventBased(true);
       terrenderRef.current.setPreDrawCallback(() => {
-        terrenderRef.current?.drawCustom(drawSky);
+        skyquadRef.current?.render();
+        celestialBodiesRef.current?.renderPath();
+        celestialBodiesRef.current?.renderPosition();
+      });
+      terrenderRef.current.setDrawCallback(() => {
+        tracingRef.current?.renderTracingArea();
       });
       terrenderRef.current.setRenderLoopCallback(() => {
         /** Check if tile data is loaded */
@@ -231,7 +419,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         celestialBodiesRef.current = null;
       }
     };
-  }, [config, drawSky]);
+  }, [config]);
 
   /** Sync skyQuad values */
   useEffect(() => {
@@ -249,69 +437,55 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
 
   //Sync celestialBodies when lat, lng, time or date changes
   useEffect(() => {
-    if (celestialBodiesRef.current && terrenderRef.current) {
+    if (celestialBodiesRef.current) {
       celestialBodiesRef.current.updatePath(
-        latLngToCoordsMemo.lat,
-        latLngToCoordsMemo.lng,
+        landmarkToCoordMemo.lat,
+        landmarkToCoordMemo.lng,
         date,
         currentDirection,
+        landmarkElevationMemo,
       );
       forceRender();
     }
   }, [
     date,
     forceRender,
-    latLngToCoordsMemo.lat,
-    latLngToCoordsMemo.lng,
+    landmarkToCoordMemo.lat,
+    landmarkToCoordMemo.lng,
     currentDirection,
+    landmarkElevationMemo,
   ]);
 
   useEffect(() => {
-    if (celestialBodiesRef.current && terrenderRef.current) {
+    if (celestialBodiesRef.current) {
       celestialBodiesRef.current.updatePosition(
-        latLngToCoordsMemo.lat,
-        latLngToCoordsMemo.lng,
+        landmarkToCoordMemo.lat,
+        landmarkToCoordMemo.lng,
         dateTimeMemo,
         currentDirection,
+        landmarkElevationMemo,
       );
       forceRender();
     }
   }, [
-    date,
     forceRender,
-    latLngToCoordsMemo.lat,
-    latLngToCoordsMemo.lng,
+    landmarkToCoordMemo.lat,
+    landmarkToCoordMemo.lng,
     dateTimeMemo,
     currentDirection,
+    landmarkElevationMemo,
   ]);
 
   //Tracing Hook
   useEffect(() => {
-    if (celestialBodiesRef.current && terrenderRef.current) {
-      if (elevationCurrentCenter > 0) {
-        celestialBodiesRef.current.updateTracingLine(
-          latLngToCoordsMemo.lat,
-          latLngToCoordsMemo.lng,
-          date,
-          elevationCurrentCenter,
-        );
-        console.log("elevation", elevationCurrentCenter);
-      }
-
-      celestialBodiesRef.current.getTraceForTime(dateTimeMemo);
-      console.log(
-        "currentTrace",
-        celestialBodiesRef.current.getTraceForTime(dateTimeMemo),
+    if (tracingRef.current) {
+      tracingRef.current.updateTracingArea(
+        new Float32Array(tracingCoordsSun.flat()),
+        new Float32Array(tracingCoordsMoon.flat()),
       );
+      forceRender();
     }
-  }, [
-    date,
-    dateTimeMemo,
-    elevationCurrentCenter,
-    forceRender,
-    latLngToCoordsMemo.lat,
-    latLngToCoordsMemo.lng,
-  ]);
+  }, [forceRender, tracingCoordsSun, tracingCoordsMoon]);
 
   //TODO: visibility: farPlane zvector change in camera, projectiveProjection, convert z into real world with heightScaling Parameter, shader scalingFactor terrainRendering fragment shader make it white
   useEffect(() => {
@@ -319,131 +493,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       return;
     }
   }, [sliderVisibility]);
-
-  /** Calculates newPos and newTarget in order to move on terrain to a specified location.
-   * - Coordinate system gl:
-   *      x: horizontal, +x on right => lng: E,W;
-   *      y: vertical, +y on top;  => lat: S,N
-   *      z: backwards and forward, +z backwards => tilt.
-   *  - newPos: [lng, lat, z], the new location of the camera. Camera is the center of the canvas.
-   *  - newTarget: [lng, terrenderRef.current.getCamera().target[1], terrenderRef.current.getCamera().target[2]], the target of the camera. Camera looks at target.
-   *  - elevation: raw elevation data for specific lng, lat point.
-   *  - amplification: set to 4 such that observer height is set relative to height of terrain at specified lat, lng.
-   */
-  /** 
-  const getTerrainHeight = useCallback((lat: number, lng: number): number => {
-    if (terrenderRef.current) {
-      const elevation = terrenderRef.current
-        .getQuadTree()
-        .getHeightValue(lng, lat);
-      return elevation;
-    } else {
-      throw new TypeError("terrenderRef is undefined.");
-    }
-  }, []);
-
-  const getTerrainPosition = useCallback(
-    (
-      latLng: L.LatLngExpression,
-    ): { lat: number; lng: number; zCoord: number; newPos: number[] } => {
-      if (terrenderRef.current) {
-        const { lat, lng } = convertLatLngToCoords(latLng);
-        const elevation = getTerrainHeight(lat, lng);
-        //TODO: elevation + amplification as amplification is offset for elevation
-        //Before: const z = elevation * terrenderRef.current.getParameters().heightScaling * amplification;
-        const z =
-          elevation *
-          terrenderRef.current.getParameters().heightScaling *
-          amplification;
-        const position = [lng, lat, z];
-        return { lat: lat, lng: lng, zCoord: z, newPos: position };
-      } else {
-        throw new TypeError("terrenderRef is undefined.");
-      }
-    },
-    [getTerrainHeight],
-  );
-
-  const moveToLocation = useCallback(
-    (latLng: L.LatLngExpression) => {
-      console.log("DEBUG moveToLocation", latLng);
-      // If center changes while Camera is not in topDown => getCamera().target is [0, 0, 1]  
-      if (terrenderRef.current && !isTopDown) {
-        const { newPos } = getTerrainPosition(latLng);
-        const newTarget = [
-          newPos[0],
-          ...terrenderRef.current.getCamera().target.slice(1),
-        ];
-        terrenderRef.current.getCamera().changeCamPosition(newPos, newTarget);
-        setCurrentDirection(0);
-      } else if (terrenderRef.current && isTopDown) {
-        // If center changes while Camera is in topDown => getCamera().target is [0, 1, 0]
-        const { newPos } = getTerrainPosition(latLng);
-        setTopDownConfigs((prevConfigs) =>
-          prevConfigs
-            ? {
-                initialUp: prevConfigs.initialUp,
-                position: newPos,
-                target: [newPos[0], ...prevConfigs.target.slice(1)],
-              }
-            : undefined,
-        );
-
-        const newTarget = [newPos[0], newPos[1], 0];
-        const newPosition = [newPos[0], newPos[1], topDownCamZCoord];
-        terrenderRef.current
-          .getCamera()
-          .changeCamPosition(newPosition, newTarget);
-        setCurrentDirection(0);
-      }
-    },
-    [getTerrainPosition, isTopDown],
-  );*/
-
-  /** If center changes and didInitialDraw => moveToLocation.
-   * - didInitialDraw is true when tiles finished loading.
-   */
-  /** 
-  useEffect(() => {
-    if (center && didInitialDraw) {
-      moveToLocation(center);
-      const { lat, lng } = convertLatLngToCoords(center);
-      const elevation = getTerrainHeight(lat, lng);
-      setElevationCurrentCenter(elevation);
-    }
-  }, [
-    center,
-    didInitialDraw,
-    getTerrainHeight,
-    moveToLocation,
-    setElevationCurrentCenter,
-  ]);
-
-  useEffect(() => {
-    if (terrenderRef.current) {
-      const { position, target, initialUp } = terrenderRef.current.getCamera();
-      const newPosition = [
-        position[0],
-        position[1],
-        (elevationCurrentCenter + sliderElevation) *
-          terrenderRef.current.getParameters().heightScaling *
-          amplification,
-      ];
-
-      console.log(
-        `DEBUG elevation change ${elevationCurrentCenter}, ${sliderElevation}`,
-        position,
-        initialUp,
-        target,
-        "newPosition",
-        newPosition,
-      );
-
-      terrenderRef.current.getCamera().changeCamPosition(newPosition, target);
-    } else {
-      console.warn("terrenderRef is null in moveCamUpZCoord.");
-    }
-  }, [elevationCurrentCenter, sliderElevation]);*/
 
   //TODO: bug with compass, moving compass, topDownMode, compass set to 0, disable topDownMode, compass !set to 0 + location incorrect
   useEffect(() => {
@@ -461,12 +510,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         terrenderRef.current.getParameters().heightScaling *
         camHeightMultiplier;
 
-      console.log(
-        "z",
-        z,
-        terrenderRef.current.getParameters().heightScaling,
-        elevation,
-      );
       if (isTopDown) {
         const topDownPosition = [lng, lat, 0.1];
         const topDownTarget = [lng, lat, 0];
@@ -474,6 +517,12 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
           .getCamera()
           .lookAt(topDownPosition, topDownTarget, [0, 1, 0]);
       } else {
+        /** 
+        const newPos = [lng, lat, z];
+        const newTarget = [
+          lng,
+          ...terrenderRef.current.getCamera().target.slice(1),
+        ];*/
         const newPos = [lng, lat, z];
         const newTarget = [
           lng,
@@ -481,8 +530,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         ];
         terrenderRef.current.getCamera().changeCamPosition(newPos, newTarget);
       }
-      //setCurrentDirection(0);
-      console.log("target", terrenderRef.current.getCamera().target);
     }
   }, [
     center,
@@ -523,7 +570,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         const topDownTarget = [position[0], position[1], 0];
         terrenderRef.current
           .getCamera()
-          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]);
+          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]); // y,x,z
       }
     }
   };

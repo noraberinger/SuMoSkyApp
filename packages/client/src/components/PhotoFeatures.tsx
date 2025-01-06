@@ -69,6 +69,8 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
             fontWeight: "bold",
             lineHeight: "normal",
           },
+          border: "2px solid",
+          borderColor: "grey.600",
         }}
       >
         <AccordionSummary
@@ -79,7 +81,13 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           <Typography sx={{ textTransform: "uppercase" }}>Sun Times</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          <Typography sx={{ textTransform: "uppercase" }}>
+          <Typography
+            sx={{
+              textTransform: "uppercase",
+              paddingLeft: "0.5em",
+              paddingBottom: "0.5em",
+            }}
+          >
             - Start Morning <br /> Blue Hour: {sunTimes.blueHourMorning}{" "}
             {getAmPm(sunTimes.blueHourMorning)}
             <br />
@@ -103,6 +111,7 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           </Typography>
         </AccordionDetails>
       </Accordion>
+      <div style={{ padding: "0.016em" }} />
       <Accordion
         expanded={expandedMoonAccordion}
         onChange={() => handleAccordionToggle("moon")}
@@ -121,6 +130,8 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
             fontWeight: "bold",
             lineHeight: "normal",
           },
+          border: "2px solid",
+          borderColor: "grey.600",
         }}
       >
         <AccordionSummary
@@ -133,7 +144,13 @@ const PhotoFeatures: React.FC<PhotoFeatureProps> = ({
           </Typography>
         </AccordionSummary>
         <AccordionDetails>
-          <Typography sx={{ textTransform: "uppercase" }}>
+          <Typography
+            sx={{
+              textTransform: "uppercase",
+              paddingLeft: "0.5em",
+              paddingBottom: "0.5em",
+            }}
+          >
             - Rise: {moonTimes.rise} {getAmPm(moonTimes.rise)}
             <br />
             <br />- Set: {moonTimes.set} {getAmPm(moonTimes.set)}

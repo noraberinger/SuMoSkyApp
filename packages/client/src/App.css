@@ -7,3 +7,12 @@ body, html, #root {
   overflow-x: hidden;
 }
 
+.leaflet-control-layers.leaflet-control {
+  bottom: 1.5rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.leaflet-control-zoom.leaflet-control {
+  bottom: 0rem !important;
+  margin-bottom: 1rem !important;
+}

@@ -2,7 +2,7 @@
 
 ## General Setup
 Make sure to run `git submodule init` after cloning this repo to your local machine.
-In order to update the sumbodules execute `git submodule update`.
+In order to update the sumbodules execute `git submodule update --remote`.
 
 ## Using the Development Server
 In order to provide real-time updates during development, this project uses webpack-dev-server.

@@ -11,7 +11,7 @@ import {
 interface VisibilitySliderProps {
   value: number;
   onChange: (value: number) => void;
-  center: LatLngExpression | undefined;
+  landmark: LatLngExpression | undefined;
   selectedDate: Date;
   sliderTime: number;
 }
@@ -96,7 +96,7 @@ const getHourlyEpoch = (currentTime: Date) => {
 const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   value,
   onChange,
-  center,
+  landmark,
   selectedDate,
   sliderTime,
 }) => {
@@ -106,7 +106,7 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
 
   /** Params for fetch */
   const currentTime = convertDateTime(selectedDate, sliderTime);
-  const visibility = useVisibilityData(center);
+  const visibility = useVisibilityData(landmark);
 
   /** Snackbar Handling, trigger Snachbar when no forecast available */
   const triggerSnackbarClose = () => {

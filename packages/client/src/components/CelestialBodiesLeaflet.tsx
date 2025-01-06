@@ -10,7 +10,7 @@ import {
 
 interface CelestialBodiesProps {
   mapRef: React.MutableRefObject<L.Map | null>;
-  center?: L.LatLngExpression;
+  landmark: L.LatLngExpression | undefined;
   date: Date;
   time: number;
   showSun: boolean;
@@ -236,7 +236,7 @@ const drawArc = (
 
 export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
   mapRef,
-  center,
+  landmark: center,
   date,
   time,
   showSun,
