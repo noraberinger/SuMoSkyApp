@@ -123,19 +123,19 @@ const App: React.FC = () => {
     initialMoonPhase,
   );
 
+  //Toggle boolean for ElevationSlider and VisibilitySlider
+  const [showElevVisSlider, setShowElevVisSlider] = useState(true);
   /** Elevation slider */
   const [sliderElevation, setSliderElevation] = useState<number>(0);
-  const [showElevationSlider, setShowElevationSlider] = useState(false);
   /** Get elevation data from Terrender */
   const [elevationCurrentCenter, setElevationCurrentCenter] =
     useState<number>(0);
 
   /** Visibility slider */
-  const initialVisibilitySlider = 0;
+  const initialVisibilitySlider = 3;
   const [sliderVisibility, setSliderVisibility] = useState<number>(
     initialVisibilitySlider,
   );
-  const [showVisibilitySlider, setShowVisibilitySlider] = useState(false);
   /** Tracking Top Down Mode Terrender. Visibility feature only available when not top down. */
   const [toggledTopDown, setToggledTopDown] = useState<boolean>(false);
 
@@ -171,8 +171,7 @@ const App: React.FC = () => {
   };
 
   const handleFabClick = () => {
-    setShowElevationSlider(!showElevationSlider);
-    setShowVisibilitySlider(!showVisibilitySlider);
+    setShowElevVisSlider(!showElevVisSlider);
   };
 
   return (
@@ -464,7 +463,7 @@ const App: React.FC = () => {
                   "& > *": { pointerEvents: "all" },
                 }}
               >
-                {showElevationSlider && !toggledTopDown && (
+                {showElevVisSlider && !toggledTopDown && (
                   <ElevationSlider
                     value={sliderElevation}
                     onChange={setSliderElevation}
@@ -480,7 +479,7 @@ const App: React.FC = () => {
                   "& > *": { pointerEvents: "all" },
                 }}
               >
-                {showVisibilitySlider && !toggledTopDown && (
+                {showElevVisSlider && !toggledTopDown && (
                   <VisibilitySlider
                     value={sliderVisibility}
                     onChange={setSliderVisibility}

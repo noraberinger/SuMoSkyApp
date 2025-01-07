@@ -12,7 +12,6 @@ import {
   calculateTriangleLegs,
   toDeg,
   translateCoords,
-  normalizeDegrees,
 } from "./Utils/Calc";
 import { ThemeProvider } from "@mui/material";
 import { functionalities } from "./Utils/ColorThemes";
@@ -25,7 +24,7 @@ const getSunAngles = (
   start: Date,
   end: Date,
 ) => {
-  //Get Azimuth using suncalc, this gives use the direction of the body in horizontal plane (horizontal angle)
+  //Get Azimuth and Altitude using suncalc, this gives use the direction of the body in horizontal plane (horizontal angle) and the vertical angle respectively
   //t-n'
   const startAnglesSun = SunCalc.getPosition(start, landmark.lat, landmark.lng);
   //t+n'
@@ -33,10 +32,21 @@ const getSunAngles = (
 
   return [
     startAnglesSun.azimuth,
-    endAnglesSun.azimuth,
     startAnglesSun.altitude,
+    endAnglesSun.azimuth,
     endAnglesSun.altitude,
   ];
+};
+
+//Find the vector of two angles
+const getVectorFromAngles = (azimuth: number, altitude: number) => {
+  const flippedAzimuth = azimuth - Math.PI;
+
+  const x = Math.sin(flippedAzimuth) * Math.cos(altitude);
+  const y = Math.cos(flippedAzimuth) * Math.cos(altitude);
+  const z = Math.sin(altitude);
+
+  return [x, y, z];
 };
 
 export interface ClientConfig {
@@ -99,6 +109,8 @@ class CustomTerrender extends Terrender {
 
 /** When this zCoord is 1 Camera is at Horizon line => acts as a proportional offset */
 const camHeightMultiplier = 1;
+/** Time offsets in minutes for tracing => currently over interval of 1 hour 6 triangles are created */
+const timeOffsets = [-30, -20, -10, 0, 10, 20, 30];
 
 /**
  * @returns TerrenderCanvas
@@ -168,7 +180,61 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     return new Date();
   }, [date, time]);
 
-  const tracingCoordsSun = useMemo(() => {
+  const distanceFactorMemo = useMemo(() => {
+    /** Factor for sun tracing, adjusting distance by the specified number */
+    const distanceFactor = sliderVisibility;
+    return distanceFactor;
+  }, [sliderVisibility]);
+
+  const tracingCoordsSun2 = useMemo(() => {
+    const tracingPoints = [];
+
+    const tenMinAngles = timeOffsets.map((timeDelta) => {
+      return getSunAngles(
+        landmarkToCoordMemo,
+        new Date(dateTimeMemo.getTime() + timeDelta * 60000),
+        new Date(dateTimeMemo.getTime() + (timeDelta + 10) * 60000),
+      );
+    });
+
+    //Basepoint = landmark, has to be calculated once
+    const p_0 = [
+      landmarkToCoordMemo.lng,
+      landmarkToCoordMemo.lat,
+      landmarkElevationMemo * 0.000025,
+    ];
+
+    for (let i = 0; i < tenMinAngles.length - 1; i++) {
+      //Start Angle => t-n'
+      const v_1 = getVectorFromAngles(tenMinAngles[i][0], tenMinAngles[i][1]);
+      //End Angle => t+n'
+      const v_2 = getVectorFromAngles(tenMinAngles[i][2], tenMinAngles[i][3]);
+
+      //Point deduced from the vector representing t-n'
+      const p_1 = [
+        p_0[0] - v_1[0] * distanceFactorMemo,
+        p_0[1] - v_1[1] * distanceFactorMemo,
+        p_0[2] - v_1[2] * distanceFactorMemo,
+      ];
+      //Point deduced from the vector representing t+n'
+      const p_2 = [
+        p_0[0] - v_2[0] * distanceFactorMemo,
+        p_0[1] - v_2[1] * distanceFactorMemo,
+        p_0[2] - v_2[2] * distanceFactorMemo,
+      ];
+
+      tracingPoints.push(p_0, p_1, p_2, p_0);
+    }
+
+    return tracingPoints;
+  }, [
+    dateTimeMemo,
+    distanceFactorMemo,
+    landmarkElevationMemo,
+    landmarkToCoordMemo,
+  ]);
+
+  const tracingCoordsShadowSun = useMemo(() => {
     /*
     const tenMinSunAzimuths = [-30, -20, -10, 0, 10, 20].map((timeDelta) => {
       return getSunAzimuths(
@@ -222,8 +288,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       new Date(dateTimeMemo.getTime() + 30 * 60000),
     );
 
-    console.log("azimuth before", toDeg(sunAzimuths[1]));
-    console.log("azimuth after", normalizeDegrees(toDeg(sunAzimuths[1]) + 180));
     //Angles are in radians due to suncalc
     return [
       [
@@ -380,6 +444,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         skyquadRef.current?.render();
         celestialBodiesRef.current?.renderPath();
         celestialBodiesRef.current?.renderPosition();
+        //tracingRef.current?.renderTracingArea();
       });
       terrenderRef.current.setDrawCallback(() => {
         tracingRef.current?.renderTracingArea();
@@ -480,19 +545,17 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   useEffect(() => {
     if (tracingRef.current) {
       tracingRef.current.updateTracingArea(
-        new Float32Array(tracingCoordsSun.flat()),
+        new Float32Array(tracingCoordsSun2.flat()),
         new Float32Array(tracingCoordsMoon.flat()),
       );
       forceRender();
     }
-  }, [forceRender, tracingCoordsSun, tracingCoordsMoon]);
-
-  //TODO: visibility: farPlane zvector change in camera, projectiveProjection, convert z into real world with heightScaling Parameter, shader scalingFactor terrainRendering fragment shader make it white
-  useEffect(() => {
-    if (sliderVisibility) {
-      return;
-    }
-  }, [sliderVisibility]);
+  }, [
+    forceRender,
+    tracingCoordsShadowSun,
+    tracingCoordsMoon,
+    tracingCoordsSun2,
+  ]);
 
   //TODO: bug with compass, moving compass, topDownMode, compass set to 0, disable topDownMode, compass !set to 0 + location incorrect
   useEffect(() => {

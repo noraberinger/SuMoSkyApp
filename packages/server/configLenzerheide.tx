@@ -1,0 +1,29 @@
+{
+  "server": {
+    "hostname": "localhost",
+    "port": 3000,
+    "heightAssets": "/media/nora/MyPassport2/DataBA/LenzerHeideData/height/tif",
+    "textureAssets": "/media/nora/MyPassport2/DataBA/LenzerHeideData/color/jpeg",
+    "textureFolder": "../textures"
+  },
+  "client": {
+    "tileSideLength": 257,
+    "boundaries": [9.140625, 46.40625, 9.84375, 47.109375],
+    "estMaxHeight": 4500,
+    "xStart":	269,
+    "yStart":	194,
+    "maxLod":	9,
+    "kPatchBase": 129,
+    "currentLod": 9,
+    "errorThreshold": 1000,
+    "useCullingMetric": true,
+    "useDistanceMetric": true,
+    "useMinMaxForErrors": false,
+    "maxGpuCache": 200,
+    "maxRamCache": 400,
+    "colorIsTiff": false,
+    "colorIsJpeg": true,
+    "heightIsTiff": true,
+    "distanceMetricExponent": 1
+  }
+}

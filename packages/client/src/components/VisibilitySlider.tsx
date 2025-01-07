@@ -16,23 +16,48 @@ interface VisibilitySliderProps {
   sliderTime: number;
 }
 
-/** Generating the marking of the slider which depict elevation above sea level in m up to 10000m */
-const generateMarks = () => {
-  const marks = [];
-  for (let m = 0; m <= 10000; m += 1000) {
-    marks.push({
-      value: m,
-      label: `${m}m`,
-    });
-  }
-  return marks;
-};
+/** Logarithmic marks, distance will increase exponentially
+ *  Low values = small steps
+ *  High values = large steps
+ */
+const marks = [
+  { value: 0, label: "0m" },
+  { value: 0.5, label: "3m" },
+  { value: 1, label: "10m" },
+  { value: 1.3, label: "20m" },
+  { value: 1.5, label: "30m" },
+  { value: 1.7, label: "50m" },
+  { value: 2, label: "100m" },
+  { value: 2.3, label: "200m" },
+  { value: 2.5, label: "300m" },
+  { value: 2.7, label: "500m" },
+  { value: 3, label: "1000m" },
+  { value: 3.3, label: "2000m" },
+  { value: 3.5, label: "3000m" },
+  { value: 3.7, label: "5000m" },
+  { value: 4, label: "10000m" },
+].map((mark) => ({
+  ...mark,
+  label: mark.value % 1 === 0 || mark.value % 0.5 === 0 ? mark.label : "", // Only show labels for major marks
+}));
 
-const marks = generateMarks();
+function logToLinear(logValue: number) {
+  if (logValue <= 0) {
+    return 0;
+  }
+  return Math.log10(logValue / 10000) + 4;
+}
+
+function linearToLog(linearValue: number) {
+  if (linearValue <= 0) {
+    return 0;
+  }
+  return Math.pow(10, linearValue - 4) * 10000;
+}
 
 /** Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
 function valueText(value: number) {
-  return `${value} m`;
+  return `${Math.round(linearToLog(value))} m`;
 }
 
 /** Fetching of Visibility Forecast */
@@ -104,6 +129,10 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   const snackbarStates = { openSnackbarForecast };
   const setSnackbarStates = { openSnackbarForecast: setOpenSnackbarForecast };
 
+  const handleChange = (_: Event, newValue: number | number[]) => {
+    onChange(linearToLog(newValue as number));
+  };
+
   /** Params for fetch */
   const currentTime = convertDateTime(selectedDate, sliderTime);
   const visibility = useVisibilityData(landmark);
@@ -126,12 +155,12 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
       <Slider
         size="small"
         track={false}
-        value={value}
-        onChange={(e, newValue) => onChange(newValue as number)}
+        value={logToLinear(value)}
+        onChange={handleChange}
         marks={marks}
         min={0}
-        max={10000}
-        step={100}
+        max={4}
+        step={0.01}
         getAriaValueText={valueText}
         valueLabelDisplay={"on"}
         valueLabelFormat={valueText}
@@ -150,7 +179,8 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
       {!noVisibilityValue && (
         <div style={{ color: "white", marginTop: "1em" }}>
           <Typography>
-            Current Visibility: {visibility?.[getHourlyEpoch(currentTime)]}m
+            Current Visibility Distance:{" "}
+            {visibility?.[getHourlyEpoch(currentTime)]}m
           </Typography>
         </div>
       )}

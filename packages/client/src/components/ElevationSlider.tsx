@@ -66,7 +66,7 @@ const ElevationSlider: React.FC<ElevationSliderProps> = ({
       />
       <div style={{ color: "white", marginTop: "1em" }}>
         <Typography>
-          Current Location: {Math.round(elevationCurrentCenter)}m + {value}m
+          Current Elevation: {Math.round(elevationCurrentCenter)}m + {value}m
         </Typography>
       </div>
     </>
