@@ -57,19 +57,19 @@ interface ClientConfig {
   dollyCam?: object[];
 }
 
-/** Main access point for the appliation */
+/* Main access point for the appliation */
 const App: React.FC = () => {
-  /** For client config and possible error messages when loading. */
+  /* For client config and possible error messages when loading. */
   const [clientConfig, setClientConfig] = useState<ClientConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /** Toggle on/off DTL Features */
+  /* Toggle on/off DTL Features */
   const [isDTLVisible, setIsDTLVisible] = useState(true);
 
-  /** Map reference => LeafletMap */
+  /* Map reference => LeafletMap.tsx */
   const mapRef = useRef<L.Map | null>(null);
 
-  /** For Marker functionality when accessed over SearchField.
+  /* For Marker functionality when accessed over SearchField.
    *  By default set to the position of Zurich. */
   const [markers, setMarkers] = useState<Marker[]>([
     {
@@ -92,11 +92,11 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(now);
   const [sliderTime, setSliderTime] = useState<number>(initialSliderTime);
 
-  /** Information for buttons controlling if sun/moon content rendered on Leaflet map */
+  /* Booleans toggling on/off Sun and Moon, which are rendered using CelestialBodies LeafletMap.tsx and shown on top of LeafletMap.tsx */
   const [showSun, setShowSun] = useState(true);
   const [showMoon, setShowMoon] = useState(true);
 
-  /** Accordion information for sun and moon times */
+  /* Accordion information for PhotoFeatures.tsx */
   const initialSunTimes = {
     sunrise: "",
     sunset: "",
@@ -123,28 +123,31 @@ const App: React.FC = () => {
     initialMoonPhase,
   );
 
-  //Toggle boolean for ElevationSlider and VisibilitySlider
+  /* Boolean toggling on/off ElevationSlider.tsx and VisibilitySlider.tsx */
   const [showElevVisSlider, setShowElevVisSlider] = useState(true);
-  /** Elevation slider */
+  /** Elevation slider
+   *  Elevation data updated from TerrenderCanvas.tsx
+   */
   const [sliderElevation, setSliderElevation] = useState<number>(0);
-  /** Get elevation data from Terrender */
   const [elevationCurrentCenter, setElevationCurrentCenter] =
     useState<number>(0);
 
-  /** Visibility slider */
+  /** Visibility slider
+   *  User input enlarges or shrinks tracing area calculated by TerrenderCanvas.tsx and renderd by Tracing.ts
+   */
   const initialVisibilitySlider = 3;
   const [sliderVisibility, setSliderVisibility] = useState<number>(
     initialVisibilitySlider,
   );
-  /** Tracking Top Down Mode Terrender. Visibility feature only available when not top down. */
+  /* Boolean toggling on/off Elevation and Visibility sliders. Off when Camera in top down mode. */
   const [toggledTopDown, setToggledTopDown] = useState<boolean>(false);
 
-  /** DTL Plans */
+  /* DTL Plans */
   const [savedPlans, setSavedPlans] = useState<Plan[]>([]);
 
   if (error) console.warn(error);
 
-  /** Fetch ClientConfig from Server -> result of processClientConfig */
+  /* Fetch ClientConfig from Server -> result of processClientConfig */
   useEffect(() => {
     const fetchConfig = async () => {
       try {

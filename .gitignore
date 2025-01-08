@@ -1,3 +1,4 @@
 packages/**/dist/
 packages/**/node_modules/ 
 node_modules/
+.codegpt

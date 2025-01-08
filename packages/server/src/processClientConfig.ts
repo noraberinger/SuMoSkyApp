@@ -1,4 +1,4 @@
-//Translated this file from .js into .ts, the .js file was authored by Julian Croci.
+/* Translated this file from .js into .ts, the .js file was authored by Julian Croci. */
 
 import * as nconf from "nconf";
 
@@ -32,7 +32,7 @@ interface ClientConfig {
 const processClientConfig = (conf: nconf.Provider): ClientConfig => {
   let clientConfig: ClientConfig = conf.get("client") || {};
 
-  // Set default values
+  /* Set default values */
   clientConfig = {
     tileSideLength: 257,
     boundaries: [-180, -90, 180, 90],
@@ -58,7 +58,7 @@ const processClientConfig = (conf: nconf.Provider): ClientConfig => {
     ...clientConfig,
   };
 
-  // Set values that can be derived from server settings
+  /* Set values that can be derived from server settings */
   const geomFolder: string | undefined = conf.get("server:geomErrorFolder");
   clientConfig.useGeomMetric =
     geomFolder && clientConfig.useGeomMetric !== false ? true : false;
@@ -67,7 +67,7 @@ const processClientConfig = (conf: nconf.Provider): ClientConfig => {
   clientConfig.noColorTextures =
     !clientConfig.noColorTextures && textureFolder ? false : true;
 
-  // Handle cam settings
+  /* Handle cam settings */
   if (!clientConfig.initialCamera) {
     clientConfig.initialCamera = {};
   }

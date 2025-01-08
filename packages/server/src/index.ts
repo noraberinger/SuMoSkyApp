@@ -25,7 +25,7 @@ interface ClientConfig {
   colorIsJpeg: boolean;
 }
 
-// Function to resolve paths
+/* Function to resolve paths */
 const resolvePath = (filePath: string): string | undefined => {
   if (!filePath) {
     return undefined;
@@ -33,7 +33,7 @@ const resolvePath = (filePath: string): string | undefined => {
   return path.isAbsolute(filePath) ? filePath : path.join(__dirname, filePath);
 };
 
-// Load configuration
+/* Load configuration */
 const configFile = process.argv[2] || "./server-config.json";
 nconf.file(configFile);
 
@@ -53,14 +53,14 @@ const textureAssetFolder = serverConfig.textureAssets;
 const geomErrorFolder = serverConfig.geomErrorFolder;
 const textureFolder = serverConfig.textureFolder;
 
-// Process client configuration
+/* Process client configuration */
 const clientConfig = processClientConfig(nconf) as ClientConfig;
 
-// Initialize express app and static server
+/* Initialize express app and static server */
 const app = express();
 const staticServer = new StaticServer(`../client/dist`);
 
-// Handle textureFolder
+/* Handle textureFolder */
 if (textureFolder) {
   app.use("/textures", express.static(textureFolder));
 } else {
@@ -69,10 +69,10 @@ if (textureFolder) {
   });
 }
 
-/** Uncomment if one wants to log */
+/* UNCOMMENT IF ONE WANTS TO LOG ANY ERRORS */
 //const errorFilePath = path.join(__dirname, "errorfile.json");
 
-// Handle height asset requests
+/* Handle height asset requests */
 const handleHeightAsset = async (req: Request, res: Response) => {
   const lod = parseInt(req.params.lod);
   const x = parseInt(req.params.xIndex);
@@ -90,7 +90,7 @@ const handleHeightAsset = async (req: Request, res: Response) => {
     res.sendFile(filePath);
   } catch {
     res.status(204).send(`Height map not found for LOD: ${lod} at ${x}/${y}`);
-    /**
+    /** UNCOMMENT IF ONE WANTS TO LOG ANY ERRORS
     fs.appendFileSync(
       errorFilePath,
       JSON.stringify(`Height: ${lod}/${x}/${y}`) + "\n",

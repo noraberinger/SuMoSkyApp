@@ -3,32 +3,28 @@ import SunCalc from "suncalc";
 import { useRef, useEffect, useState, useMemo } from "react";
 import { Terrender, StandardInputHandler } from "terrender-core";
 import Button from "@mui/material/Button";
-//import TextField from "@mui/material/TextField";
 import L from "leaflet";
 import SkyQuadBlended from "./Utils/SkyQuadBlended";
 import {
   convertDateTime,
   convertLatLngToCoords,
-  calculateTriangleLegs,
   toDeg,
   translateCoords,
 } from "./Utils/Calc";
-import { ThemeProvider } from "@mui/material";
+import { ThemeProvider, Snackbar, Alert, Portal } from "@mui/material";
 import { functionalities } from "./Utils/ColorThemes";
 import Compass from "./Compass";
 import CelestialBodies from "./Utils/CelestialBodies";
 import Tracing from "./Utils/Tracing";
 
+/* Helper functions calculating Sun and Moon Angles azimuth (horizontal angle) and altitude in radians */
 const getSunAngles = (
   landmark: { lat: number; lng: number },
   start: Date,
   end: Date,
 ) => {
-  //Get Azimuth and Altitude using suncalc, this gives use the direction of the body in horizontal plane (horizontal angle) and the vertical angle respectively
-  //t-n'
-  const startAnglesSun = SunCalc.getPosition(start, landmark.lat, landmark.lng);
-  //t+n'
-  const endAnglesSun = SunCalc.getPosition(end, landmark.lat, landmark.lng);
+  const startAnglesSun = SunCalc.getPosition(start, landmark.lat, landmark.lng); //t-timeOffsetInMinutes
+  const endAnglesSun = SunCalc.getPosition(end, landmark.lat, landmark.lng); //t+timeOffsetInMinutes
 
   return [
     startAnglesSun.azimuth,
@@ -38,7 +34,31 @@ const getSunAngles = (
   ];
 };
 
-//Find the vector of two angles
+const getMoonAngles = (
+  landmark: { lat: number; lng: number },
+  start: Date,
+  end: Date,
+) => {
+  const startAnglesMoon = SunCalc.getMoonPosition(
+    start,
+    landmark.lat,
+    landmark.lng,
+  );
+  const endAnglesMoon = SunCalc.getMoonPosition(
+    end,
+    landmark.lat,
+    landmark.lng,
+  );
+
+  return [
+    startAnglesMoon.azimuth,
+    startAnglesMoon.altitude,
+    endAnglesMoon.azimuth,
+    endAnglesMoon.altitude,
+  ];
+};
+
+/* Find the distance vector of azimuth and altitude */
 const getVectorFromAngles = (azimuth: number, altitude: number) => {
   const flippedAzimuth = azimuth - Math.PI;
 
@@ -107,9 +127,9 @@ class CustomTerrender extends Terrender {
   };
 }
 
-/** When this zCoord is 1 Camera is at Horizon line => acts as a proportional offset */
+/* When this zCoord is 1, Camera is at Horizon line => acts as a proportional offset */
 const camHeightMultiplier = 1;
-/** Time offsets in minutes for tracing => currently over interval of 1 hour 6 triangles are created */
+/* Time offsets in minutes for tracing => currently over interval of 1 hour 6 triangles are created */
 const timeOffsets = [-30, -20, -10, 0, 10, 20, 30];
 
 /**
@@ -133,7 +153,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   const terrenderRef = useRef<CustomTerrender | null>(null);
   const inputHandlerRef = useRef<StandardInputHandler | null>(null);
   const [didInitialDraw, setDidInitialDraw] = useState(false);
-  /** For toggleTopDownMode and moveToLocation in topDown */
   const [topDownConfigs, setTopDownConfigs] = useState<
     | {
         position: number[];
@@ -146,20 +165,24 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     setToggledTopDown(isTopDown);
   }, [isTopDown, setToggledTopDown]);
 
-  /** References for WebGL Objects, drawn using function drawSky */
+  /* References for WebGL Objects */
   const skyquadRef = useRef<SkyQuadBlended | null>(null);
   const celestialBodiesRef = useRef<CelestialBodies | null>(null);
   const tracingRef = useRef<Tracing | null>(null);
-  /** Compass direction */
+  /* Compass direction/heading */
   const [currentDirection, setCurrentDirection] = useState<number>(0);
 
-  /** Memo calculations for date, time, lat, lng */
+  /** Memo calculations for:
+   *  - landmarkToCoordMemo: Convert LatLng to Coords
+   *  - landmarkElevationMemo: Get Elevation at landmark
+   *  - dateTimeMemo: Convert Date and Time to Date
+   *  - distanceFactorMemo: Unit factor for sun tracing, the higher the factor the further the sun tracing. Factor is adjusted by sliderVisibility.
+   */
   const landmarkToCoordMemo = useMemo(() => {
     if (center) {
       return convertLatLngToCoords(center);
     }
-    //return default if no center provided
-    return { lat: 0, lng: 0 };
+    return { lat: 0, lng: 0 }; /* return default value if no center provided */
   }, [center]);
 
   const landmarkElevationMemo = useMemo(() => {
@@ -176,17 +199,21 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       const currentDate = convertDateTime(date, time);
       return currentDate;
     }
-    //return default now if no time provided
-    return new Date();
+    return new Date(); /* return default value if no time provided */
   }, [date, time]);
 
   const distanceFactorMemo = useMemo(() => {
-    /** Factor for sun tracing, adjusting distance by the specified number */
     const distanceFactor = sliderVisibility;
     return distanceFactor;
   }, [sliderVisibility]);
 
-  const tracingCoordsSun2 = useMemo(() => {
+  /* Memo calculations for tracing coordinates of the Sun and Moon */
+  const tracingCoordsSun = useMemo(() => {
+    if (!terrenderRef.current) {
+      console.warn("Terrender not initialized");
+      return;
+    }
+
     const tracingPoints = [];
 
     const tenMinAngles = timeOffsets.map((timeDelta) => {
@@ -197,33 +224,41 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       );
     });
 
-    //Basepoint = landmark, has to be calculated once
+    /* Basepoint = landmark, has to be calculated once */
     const p_0 = [
       landmarkToCoordMemo.lng,
       landmarkToCoordMemo.lat,
-      landmarkElevationMemo * 0.000025,
+      landmarkElevationMemo *
+        terrenderRef.current.getParameters().heightScaling,
     ];
 
     for (let i = 0; i < tenMinAngles.length - 1; i++) {
-      //Start Angle => t-n'
-      const v_1 = getVectorFromAngles(tenMinAngles[i][0], tenMinAngles[i][1]);
-      //End Angle => t+n'
-      const v_2 = getVectorFromAngles(tenMinAngles[i][2], tenMinAngles[i][3]);
+      if (tenMinAngles[i][1] > 0) {
+        const v_1 = getVectorFromAngles(
+          tenMinAngles[i][0],
+          tenMinAngles[i][1],
+        ); /* Start Angle => t-timeOffsetInMinutes */
 
-      //Point deduced from the vector representing t-n'
-      const p_1 = [
-        p_0[0] - v_1[0] * distanceFactorMemo,
-        p_0[1] - v_1[1] * distanceFactorMemo,
-        p_0[2] - v_1[2] * distanceFactorMemo,
-      ];
-      //Point deduced from the vector representing t+n'
-      const p_2 = [
-        p_0[0] - v_2[0] * distanceFactorMemo,
-        p_0[1] - v_2[1] * distanceFactorMemo,
-        p_0[2] - v_2[2] * distanceFactorMemo,
-      ];
+        const v_2 = getVectorFromAngles(
+          tenMinAngles[i][2],
+          tenMinAngles[i][3],
+        ); /* End Angle => t+timeOffsetInMinutes */
 
-      tracingPoints.push(p_0, p_1, p_2, p_0);
+        /* Point deduced from the vector representing t-timeOffsetInMinutes */
+        const p_1 = [
+          p_0[0] - v_1[0] * distanceFactorMemo,
+          p_0[1] - v_1[1] * distanceFactorMemo,
+          p_0[2] - v_1[2] * distanceFactorMemo,
+        ];
+        /* Point deduced from the vector representing t+timeOffsetInMinutes */
+        const p_2 = [
+          p_0[0] - v_2[0] * distanceFactorMemo,
+          p_0[1] - v_2[1] * distanceFactorMemo,
+          p_0[2] - v_2[2] * distanceFactorMemo,
+        ];
+
+        tracingPoints.push(p_0, p_1, p_2, p_0);
+      }
     }
 
     return tracingPoints;
@@ -234,23 +269,90 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     landmarkToCoordMemo,
   ]);
 
-  const tracingCoordsShadowSun = useMemo(() => {
-    /*
-    const tenMinSunAzimuths = [-30, -20, -10, 0, 10, 20].map((timeDelta) => {
-      return getSunAzimuths(
+  const tracingCoordsMoon = useMemo(() => {
+    if (!terrenderRef.current) {
+      console.warn("Terrender not initialized");
+      return;
+    }
+
+    const tracingPoints = [];
+
+    const tenMinAngles = timeOffsets.map((timeDelta) => {
+      return getMoonAngles(
+        landmarkToCoordMemo,
         new Date(dateTimeMemo.getTime() + timeDelta * 60000),
-        new Date(dateTimeMemo.getTime() + timeDelta + 10 * 60000),
+        new Date(dateTimeMemo.getTime() + (timeDelta + 10) * 60000),
       );
     });
 
-    const combinedCoords = tenMinSunAzimuths.map((sunAzimuths, index) => {
+    /* Basepoint = landmark, has to be calculated once */
+    const p_0 = [
+      landmarkToCoordMemo.lng,
+      landmarkToCoordMemo.lat,
+      landmarkElevationMemo *
+        terrenderRef.current.getParameters().heightScaling,
+    ];
+
+    for (let i = 0; i < tenMinAngles.length - 1; i++) {
+      if (tenMinAngles[i][1] > 0) {
+        const v_1 = getVectorFromAngles(
+          tenMinAngles[i][0],
+          tenMinAngles[i][1],
+        ); /* Start Angle => t-timeOffsetInMinutes */
+
+        const v_2 = getVectorFromAngles(
+          tenMinAngles[i][2],
+          tenMinAngles[i][3],
+        ); /* End Angle => t+timeOffsetInMinutes*/
+
+        /* Point deduced from the vector representing t-timeOffsetInMinutes */
+        const p_1 = [
+          p_0[0] - v_1[0] * distanceFactorMemo,
+          p_0[1] - v_1[1] * distanceFactorMemo,
+          p_0[2] - v_1[2] * distanceFactorMemo,
+        ];
+        /* Point deduced from the vector representing t+timeOffsetInMinutes */
+        const p_2 = [
+          p_0[0] - v_2[0] * distanceFactorMemo,
+          p_0[1] - v_2[1] * distanceFactorMemo,
+          p_0[2] - v_2[2] * distanceFactorMemo,
+        ];
+
+        tracingPoints.push(p_0, p_1, p_2, p_0);
+      }
+    }
+
+    return tracingPoints;
+  }, [
+    dateTimeMemo,
+    distanceFactorMemo,
+    landmarkElevationMemo,
+    landmarkToCoordMemo,
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const tracingCoordsShadowSun = useMemo(() => {
+    const tenMinAngles = timeOffsets.map((timeDelta) => {
+      const [startAzimuth, endAzimuth] = getSunAngles(
+        landmarkToCoordMemo,
+        new Date(dateTimeMemo.getTime() + timeDelta * 60000),
+        new Date(dateTimeMemo.getTime() + (timeDelta + 10) * 60000),
+      );
+      return [startAzimuth, endAzimuth];
+    });
+
+    const combinedCoords = tenMinAngles.map((sunAzimuths) => {
+      if (!terrenderRef.current) {
+        console.warn("Terrender not initialized");
+        return;
+      }
       const coords = [
         [
           landmarkToCoordMemo.lng,
           landmarkToCoordMemo.lat,
-          landmarkElevationMemo * 0.000025 + 1,
+          (landmarkElevationMemo + 1) *
+            terrenderRef.current.getParameters().heightScaling,
         ],
-        //Sun azimuth at t+n'
         [
           ...translateCoords(
             landmarkToCoordMemo.lng,
@@ -259,8 +361,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
             toDeg(sunAzimuths[1]),
           ),
           0,
-        ],
-        //Sun azimuth at t-n'
+        ], //Sun azimuth at t+timeOffsetInMinutes
         [
           ...translateCoords(
             landmarkToCoordMemo.lng,
@@ -269,124 +370,30 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
             toDeg(sunAzimuths[0]),
           ),
           0,
-        ],
+        ], //Sun azimuth at t-timeOffsetInMinutes
         [
           landmarkToCoordMemo.lng,
           landmarkToCoordMemo.lat,
-          landmarkElevationMemo * 0.000025,
+          landmarkElevationMemo *
+            terrenderRef.current.getParameters().heightScaling,
         ],
       ];
       return coords;
     });
 
     return combinedCoords;
-    */
-
-    const sunAzimuths = getSunAngles(
-      landmarkToCoordMemo,
-      new Date(dateTimeMemo.getTime() - 30 * 60000),
-      new Date(dateTimeMemo.getTime() + 30 * 60000),
-    );
-
-    //Angles are in radians due to suncalc
-    return [
-      [
-        landmarkToCoordMemo.lng,
-        landmarkToCoordMemo.lat,
-        (landmarkElevationMemo + 1) * 0.000025,
-      ], // get sun position TOOD => altitude vector => altitude angle
-      //Sun azimuth at t+n'
-      [
-        ...translateCoords(
-          landmarkToCoordMemo.lng,
-          landmarkToCoordMemo.lat,
-          500,
-          toDeg(sunAzimuths[1]),
-        ),
-        0,
-      ],
-      //Sun azimuth at t-n'
-      [
-        ...translateCoords(
-          landmarkToCoordMemo.lng,
-          landmarkToCoordMemo.lat,
-          500,
-          toDeg(sunAzimuths[0]),
-        ),
-        0,
-      ],
-      [
-        landmarkToCoordMemo.lng,
-        landmarkToCoordMemo.lat,
-        landmarkElevationMemo * 0.000025,
-      ],
-    ];
   }, [dateTimeMemo, landmarkToCoordMemo, landmarkElevationMemo]);
 
-  /** Calculating average position between time-30' and t+30' for the Moon */
-  const landmarkToMoonAzimuth = useMemo(() => {
-    //Get Azimuth using suncalc, this gives use the direction of the body in horizontal plane (horizontal angle); direction from landmark to body
-    const startAzimuthMoon = SunCalc.getMoonPosition(
-      new Date(dateTimeMemo.getTime() - 30 * 60000),
-      landmarkToCoordMemo.lat,
-      landmarkToCoordMemo.lng,
-    );
-    const endAzimuthMoon = SunCalc.getMoonPosition(
-      new Date(dateTimeMemo.getTime() + 30 * 60000),
-      landmarkToCoordMemo.lat,
-      landmarkToCoordMemo.lng,
-    );
-
-    return [endAzimuthMoon.azimuth, startAzimuthMoon.azimuth];
-  }, [dateTimeMemo, landmarkToCoordMemo.lat, landmarkToCoordMemo.lng]);
-
-  /** 
-  const tracingCoordsMoon = useMemo(
-    () =>
-      translateCoords(
-        landmarkToCoordMemo.lat,
-        landmarkToCoordMemo.lng,
-        3, // km TODO user settable => visibiliy sider, text field
-        toDeg(landmarkToMoonAzimuth),
-      ),
-    [landmarkToCoordMemo, landmarkToMoonAzimuth],
-  );*/
-
-  const tracingCoordsMoon = useMemo(() => {
-    //Angles are in radians due to suncalc
-    return [
-      [0, 0, 0], // get moon position TOOD
-      ...calculateTriangleLegs(
-        [
-          landmarkToCoordMemo.lat,
-          landmarkToCoordMemo.lng,
-          landmarkElevationMemo,
-        ],
-        landmarkToMoonAzimuth[0],
-        landmarkToMoonAzimuth[1],
-        1,
-      ),
-      [landmarkToCoordMemo.lat, landmarkToCoordMemo.lng, landmarkElevationMemo],
-    ];
-  }, [
-    landmarkElevationMemo,
-    landmarkToCoordMemo.lat,
-    landmarkToCoordMemo.lng,
-    landmarkToMoonAzimuth,
-  ]);
-
-  // TODO button to toggle between center & compass | tracingCoords as center & tracingMiddleAngle-180 as heading
-
-  //Helper function setting setShouldRedrawCallback in Terrender
+  /** Helper function setting setShouldRedrawCallback in Terrender
+   *  - setShouldRedrawCallback is evaluated in renderLoop of Terrender. If true, it forces a render.
+   *  - setRenderLoopCallback is called after renderLoop, with didDraw indicating if Terrender actually rendered something. This avoids terrender rendering in circles.
+   */
   const forceRender = useCallback(() => {
     if (terrenderRef.current) {
-      // setShouldRedrawCallback is evaluated in renderLoop of Terrender. If true, it forces a render.
       terrenderRef.current.setShouldRedrawCallback(() => true);
-      // setRenderLoopCallback is called after renderLoop, with didDraw indicating if Terrender actually rendered something
-      // used to disable redraw callback again, to avoid terrender rendering in circles
       terrenderRef.current.setRenderLoopCallback((didDraw: boolean) => {
         if (didDraw) terrenderRef.current?.setShouldRedrawCallback(() => false);
-        /** Check if tile data is loaded */
+        /* Check if tile data is loaded */
         if (!didInitialDraw) {
           const rootTilesReady = !terrenderRef.current
             ?.getLoadingState()
@@ -394,21 +401,12 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
           if (rootTilesReady && terrenderRef.current) setDidInitialDraw(true);
         }
       });
-      // make Terrender call renderloop
+      /* Calling render loop of Terrender */
       terrenderRef.current.requestRender();
     }
   }, [didInitialDraw]);
 
-  /** Draw all elements except terrender => terrender will be drawn after setPreDrawCallback => drawCustom(drawSky) 
-  const drawSky = useCallback((didDraw: boolean) => {
-    if (didDraw && skyquadRef.current && celestialBodiesRef.current) {
-      skyquadRef.current.render();
-      celestialBodiesRef.current.renderPath();
-      celestialBodiesRef.current.renderPosition();
-    }
-  }, []);*/
-
-  //Set up canvas
+  /* Setup of canvas */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
@@ -416,7 +414,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       return;
     }
 
-    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    const gl = canvas.getContext("webgl2");
     if (!gl) {
       console.error("WebGL not supported");
       return;
@@ -444,13 +442,12 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         skyquadRef.current?.render();
         celestialBodiesRef.current?.renderPath();
         celestialBodiesRef.current?.renderPosition();
-        //tracingRef.current?.renderTracingArea();
       });
       terrenderRef.current.setDrawCallback(() => {
         tracingRef.current?.renderTracingArea();
       });
       terrenderRef.current.setRenderLoopCallback(() => {
-        /** Check if tile data is loaded */
+        /* Check if tile data is loaded */
         const rootTilesReady = !terrenderRef.current
           ?.getLoadingState()
           .isLoading();
@@ -459,7 +456,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         }
       });
       inputHandlerRef.current = new StandardInputHandler(terrenderRef.current);
-      /** Render terrain */
+      /* Start terrain rendering */
       terrenderRef.current.start();
     } catch (error) {
       console.error(
@@ -500,7 +497,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     }
   }, [center, date, forceRender, time]);
 
-  //Sync celestialBodies when lat, lng, time or date changes
+  /* Sync celestialBodies according to changing lat, lng, time, date, viewing direction */
   useEffect(() => {
     if (celestialBodiesRef.current) {
       celestialBodiesRef.current.updatePath(
@@ -541,21 +538,18 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     landmarkElevationMemo,
   ]);
 
-  //Tracing Hook
+  /* Sync tracing Area */
   useEffect(() => {
     if (tracingRef.current) {
-      tracingRef.current.updateTracingArea(
-        new Float32Array(tracingCoordsSun2.flat()),
-        new Float32Array(tracingCoordsMoon.flat()),
-      );
-      forceRender();
+      if (tracingCoordsSun && tracingCoordsMoon) {
+        tracingRef.current.updateTracingArea(
+          new Float32Array(tracingCoordsSun.flat()),
+          new Float32Array(tracingCoordsMoon.flat()),
+        );
+        forceRender();
+      }
     }
-  }, [
-    forceRender,
-    tracingCoordsShadowSun,
-    tracingCoordsMoon,
-    tracingCoordsSun2,
-  ]);
+  }, [forceRender, tracingCoordsMoon, tracingCoordsSun]);
 
   //TODO: bug with compass, moving compass, topDownMode, compass set to 0, disable topDownMode, compass !set to 0 + location incorrect
   useEffect(() => {
@@ -580,12 +574,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
           .getCamera()
           .lookAt(topDownPosition, topDownTarget, [0, 1, 0]);
       } else {
-        /** 
-        const newPos = [lng, lat, z];
-        const newTarget = [
-          lng,
-          ...terrenderRef.current.getCamera().target.slice(1),
-        ];*/
         const newPos = [lng, lat, z];
         const newTarget = [
           lng,
@@ -609,7 +597,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
    * then sets the camera to a top-down view. If top-down mode is disabled, it restores
    * the saved camera position and target.
    */
-  //TODO: Bug when orientation is S normal, top down => N, normal => orientation S but compass heading N
   const toggleTopDownMode = () => {
     if (terrenderRef.current) {
       /**
@@ -622,7 +609,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
           .lookAt(topDownConfigs.position, topDownConfigs.target, [0, 0, 1]);
         setTopDownConfigs(undefined);
       } else {
-        // Enable topDown view, Keep track of prev values using setTopDownConfigs
+        /* Enable topDown view, Keep track of prev values using setTopDownConfigs */
         const { position, target } = terrenderRef.current.getCamera();
         setTopDownConfigs({
           position,
@@ -633,39 +620,32 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         const topDownTarget = [position[0], position[1], 0];
         terrenderRef.current
           .getCamera()
-          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]); // y,x,z
+          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]); /* y,x,z */
       }
     }
   };
 
-  /** 
-  const [positionZ, setPositionZ] = useState(0);
-
-  const [targetZ, setTargetZ] = useState(0);
-
-  const [initialUp, setInitialUp] = useState([0, 0, 1]);
-
+  const [showMoonInfo, setShowMoonInfo] = useState(false);
+  const hasShownMoonInfo = useRef(false);
+  const [showSunInfo, setShowSunInfo] = useState(false);
+  const hasShownSunInfo = useRef(false);
   useEffect(() => {
-    if (terrenderRef.current) {
-      const { position, target } = terrenderRef.current.getCamera();
-      const newPosition = [position[0], position[1], positionZ];
-      const newTarget = [target[0], target[1], targetZ];
-      console.log(
-        "DEBUG lookingAt (p,t)",
-        position,
-        target,
-        "-> (p,t)",
-        newPosition,
-        newTarget,
-        "initialUp:",
-        initialUp,
-        terrenderRef.current.getCamera(),
-      );
-      terrenderRef.current
-        .getCamera()
-        .lookAt(newPosition, newTarget, initialUp);
+    if (
+      tracingCoordsMoon &&
+      tracingCoordsMoon.length > 0 &&
+      !hasShownMoonInfo.current
+    ) {
+      setShowMoonInfo(true);
+      hasShownMoonInfo.current = true;
+    } else if (
+      tracingCoordsSun &&
+      tracingCoordsSun.length > 0 &&
+      !hasShownSunInfo.current
+    ) {
+      setShowSunInfo(true);
+      hasShownSunInfo.current = true;
     }
-  }, [positionZ, targetZ, initialUp]);*/
+  }, [tracingCoordsMoon, tracingCoordsSun]);
 
   return (
     <>
@@ -681,43 +661,6 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         id="top-down-mode-button"
         style={{ position: "absolute", bottom: "1em", right: "1em" }}
       >
-        {/*
-        <TextField
-          type="number"
-          label="positionZ"
-          value={positionZ}
-          onChange={(e) => setPositionZ(Number(e.target.value))}
-        />
-        <TextField
-          type="number"
-          label="targetZ"
-          value={targetZ}
-          onChange={(e) => setTargetZ(Number(e.target.value))}
-        />
-        <TextField
-          type="number"
-          label="initialUp[0]"
-          value={initialUp[0]}
-          onChange={(e) =>
-            setInitialUp([Number(e.target.value), initialUp[1], initialUp[2]])
-          }
-        />
-        <TextField
-          type="number"
-          label="initialUp[1]"
-          value={initialUp[1]}
-          onChange={(e) =>
-            setInitialUp([initialUp[0], Number(e.target.value), initialUp[2]])
-          }
-        />
-        <TextField
-          type="number"
-          label="initialUp[2]"
-          value={initialUp[2]}
-          onChange={(e) =>
-            setInitialUp([initialUp[0], initialUp[1], Number(e.target.value)])
-          }
-        />*/}
         <ThemeProvider theme={functionalities}>
           <Button
             color="secondary"
@@ -738,6 +681,46 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         currentDirection={currentDirection}
         topDown={toggledTopDown}
       ></Compass>
+
+      <Portal>
+        <Snackbar
+          open={showMoonInfo}
+          onClose={() => setShowMoonInfo(false)}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setShowMoonInfo(false)}
+            severity="info"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            Blue triangles on terrain show moon position over time frame ±30
+            minutes from current time. <br />
+            Only visible when moon is above horizon. <br />
+            If not visible, when moon is above horizon, please move around the
+            terrain to make them appear in your field of view.
+          </Alert>
+        </Snackbar>
+
+        <Snackbar
+          open={showSunInfo}
+          onClose={() => setShowSunInfo(false)}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setShowSunInfo(false)}
+            severity="info"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            Yellow triangles on terrain show sun position over time frame ±30
+            minutes from current time. <br />
+            Only visible when sun is above horizon. <br />
+            If not visible, when sun is above horizon, please move around the
+            terrain to make them appear in your field of view.
+          </Alert>
+        </Snackbar>
+      </Portal>
     </>
   );
 };

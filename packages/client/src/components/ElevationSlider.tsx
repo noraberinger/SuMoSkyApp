@@ -7,7 +7,7 @@ interface ElevationSliderProps {
   elevationCurrentCenter: number;
 }
 
-/** Generating the marking of the slider which depict elevation above sea level in m up to 10000m */
+/* Generating the marking of the slider which depict elevation above sea level in m up to 10000m */
 const generateMarks = () => {
   const marks = [];
   for (let m = 0; m <= 10000; m += 2000) {
@@ -21,7 +21,7 @@ const generateMarks = () => {
 
 const marks = generateMarks();
 
-/** Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
+/* Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
 function valueText(value: number) {
   return `${value}m`;
 }

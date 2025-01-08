@@ -76,25 +76,12 @@ const Compass: React.FC<CompassProps> = ({
   const calculateTopDownCamTarget = useCallback((direction: number) => {
     const angleInRadians = (normalizeDegrees(direction) * Math.PI) / 180;
 
-    /*
-    Math.sin(rotation),
-        1,
-        Math.cos(rotation)
-        */
     // TODO fix this
     if (direction >= 90 && direction < 270) {
       return [Math.sin(angleInRadians), 1, Math.abs(Math.cos(angleInRadians))];
     } else {
       return [Math.abs(Math.sin(angleInRadians)), 1, Math.cos(angleInRadians)];
     }
-
-    // Normalize to ensure consistent behavior
-    /*
-    const length = Math.sqrt(up[0] * up[0] + up[1] * up[1] + up[2] * up[2]);
-    up[0] /= length;
-    up[1] /= length;
-    up[2] /= length;
-    */
   }, []);
 
   const startDrag = useCallback(

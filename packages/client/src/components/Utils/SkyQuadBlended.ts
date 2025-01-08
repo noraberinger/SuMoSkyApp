@@ -43,7 +43,7 @@ class SkyQuadBlended {
     this.dayPhase = 0;
   }
 
-  /** Create a simple Quad */
+  /* Create a simple Quad */
   private createQuadBuffer(): twgl.BufferInfo {
     const arrays = {
       position: { numComponents: 2, data: [-1, -1, 1, -1, -1, 1, 1, 1] },
@@ -52,7 +52,7 @@ class SkyQuadBlended {
     return twgl.createBufferInfoFromArrays(this.gl, arrays);
   }
 
-  /** Create textures. */
+  /* Create textures. */
   private setupTextures(): void {
     const dayTextureUrl = "/textures/cloudy2.jpg";
     const nightTextureUrl = "/textures/pleiades_cube.jpeg";
@@ -76,7 +76,7 @@ class SkyQuadBlended {
     });
   }
 
-  /** Helper function to ensure clamping of the blendFactor */
+  /* Helper function to ensure clamping of the blendFactor */
   private clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
   }
@@ -123,7 +123,7 @@ class SkyQuadBlended {
     this.dayPhase = this.clamp(this.dayPhase, 0.0, 1.0);
   }
 
-  /** Render using a blendFactor to blend from dayTexture to nightTexture according to the sliderValue. */
+  /* Render using a blendFactor to blend from dayTexture to nightTexture according to changes of DayTimeSlider.tsx. */
   public render(): void {
     this.gl.disable(this.gl.DEPTH_TEST);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);

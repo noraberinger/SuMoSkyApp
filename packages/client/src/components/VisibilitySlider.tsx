@@ -1,6 +1,6 @@
-//Data provided by Open-Meteo, licensed under CC-BY 4.0
+/* Data provided by Open-Meteo, licensed under CC-BY 4.0 */
 import React, { useState, useEffect } from "react";
-import { Slider, Snackbar, Alert, Typography } from "@mui/material";
+import { Slider, Snackbar, Alert, Typography, Portal } from "@mui/material";
 import { LatLngExpression } from "leaflet";
 import {
   convertDateTime,
@@ -17,8 +17,8 @@ interface VisibilitySliderProps {
 }
 
 /** Logarithmic marks, distance will increase exponentially
- *  Low values = small steps
- *  High values = large steps
+ *  - Low values = small steps
+ *  - High values = large steps
  */
 const marks = [
   { value: 0, label: "0m" },
@@ -38,7 +38,10 @@ const marks = [
   { value: 4, label: "10000m" },
 ].map((mark) => ({
   ...mark,
-  label: mark.value % 1 === 0 || mark.value % 0.5 === 0 ? mark.label : "", // Only show labels for major marks
+  label:
+    mark.value % 1 === 0 || mark.value % 0.5 === 0
+      ? mark.label
+      : "" /* Only show labels for major marks */,
 }));
 
 function logToLinear(logValue: number) {
@@ -55,12 +58,12 @@ function linearToLog(linearValue: number) {
   return Math.pow(10, linearValue - 4) * 10000;
 }
 
-/** Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
+/* Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
 function valueText(value: number) {
   return `${Math.round(linearToLog(value))} m`;
 }
 
-/** Fetching of Visibility Forecast */
+/* Fetching of Visibility Forecast */
 type VisibilityByHour = { [time: number]: number };
 
 const openMeteoBaseURL = "https://api.open-meteo.com/v1/forecast";
@@ -89,7 +92,7 @@ const useVisibilityData = (
     if (coords?.lat && coords?.lng) {
       fetchData();
 
-      /** Refetch data every hour */
+      /* Refetch data every hour */
       const intervalId = setInterval(fetchData, 60 * 60 * 1000);
       return () => clearInterval(intervalId);
     }
@@ -133,11 +136,11 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
     onChange(linearToLog(newValue as number));
   };
 
-  /** Params for fetch */
+  /* Params for fetch */
   const currentTime = convertDateTime(selectedDate, sliderTime);
   const visibility = useVisibilityData(landmark);
 
-  /** Snackbar Handling, trigger Snachbar when no forecast available */
+  /* Snackbar Handling, trigger Snackbar when no forecast available */
   const triggerSnackbarClose = () => {
     handleSnackbarClose(snackbarStates, setSnackbarStates);
   };
@@ -184,17 +187,23 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
           </Typography>
         </div>
       )}
-      <Snackbar open={openSnackbarForecast} onClose={triggerSnackbarClose}>
-        <Alert
+      <Portal>
+        <Snackbar
+          open={openSnackbarForecast}
           onClose={triggerSnackbarClose}
-          severity="warning"
-          variant="filled"
-          sx={{ width: "100%" }}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          Forecast available for 16 days. For your selected date no forecast
-          data available.
-        </Alert>
-      </Snackbar>
+          <Alert
+            onClose={triggerSnackbarClose}
+            severity="warning"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            Forecast available for 16 days. For your selected date no forecast
+            data available.
+          </Alert>
+        </Snackbar>
+      </Portal>
     </>
   );
 };

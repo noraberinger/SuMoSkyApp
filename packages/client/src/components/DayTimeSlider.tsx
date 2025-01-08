@@ -6,14 +6,13 @@ interface TimeSliderProps {
   onChange: (value: number) => void;
 }
 
-/** Generating the marking of the slider which consists of a full day, respectively allows to range between 0:00 and 23:00. */
+/* Generating the marking of the slider which consists of a full day, respectively allows to range between 0:00 and 24:00. */
 const generateTimeMarks = () => {
   const marks = [];
   for (let i = 0; i <= 144; i++) {
     const hour = Math.floor(i / 6);
     marks.push({
       value: i,
-      //label: hour % 2 ? '' : `${hour}:00`
       label: hour % 2 === 0 && i % 6 === 0 ? `${hour}:00` : "",
     });
   }
@@ -22,9 +21,8 @@ const generateTimeMarks = () => {
 
 const timeMarks = generateTimeMarks();
 
-/** Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
+/* Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
 function valueText(value: number) {
-  //const hour = value % 24;
   const hour = Math.floor(value / 6);
   const minute = (value % 6) * 10;
   if (minute != 0) {

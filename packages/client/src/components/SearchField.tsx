@@ -10,6 +10,7 @@ import {
 import L from "leaflet";
 import { Marker } from "./LeafletMap";
 import { OpenStreetMapProvider } from "leaflet-geosearch";
+import { handleSnackbarClose } from "./Utils/Calc";
 
 interface SearchOption {
   label: string;
@@ -17,6 +18,7 @@ interface SearchOption {
     x: number;
     y: number;
   };
+  id: string;
 }
 
 interface SearchFieldProps {
@@ -50,10 +52,16 @@ const SearchField: React.FC<SearchFieldProps> = ({
   setMarkers,
   maxMarkers,
 }) => {
-  const [openSnackbarMaxArray, setOpenSnackbarMaxArray] = useState(false);
   const [options, setOptions] = useState<SearchOption[]>([]);
   const provider = useMemo(() => new OpenStreetMapProvider(), []);
   const [inputValue, setInputValue] = useState<string>("");
+  const [openSnackbarNoResults, setSnackbarNoResults] = useState(false);
+  const [openSnackbarMaxArray, setOpenSnackbarMaxArray] = useState(false);
+  const snackbarStates = { openSnackbarNoResults, openSnackbarMaxArray };
+  const setSnackbarStates = {
+    openSnackbarNoResults: setSnackbarNoResults,
+    openSnackbarMaxArray: setOpenSnackbarMaxArray,
+  };
 
   const debouncedInput = useDebounce(inputValue, 300);
 
@@ -65,16 +73,13 @@ const SearchField: React.FC<SearchFieldProps> = ({
           results.map((result) => ({
             label: result.label,
             value: { x: result.x, y: result.y },
+            id: `${result.label}-${result.x}-${result.y}`,
           })),
         );
       };
       searchLocations(debouncedInput);
     }
   }, [debouncedInput, provider]);
-
-  const handleSnackbarClose = () => {
-    setOpenSnackbarMaxArray(false);
-  };
 
   const handleOptionSelect = (option: SearchOption) => {
     if (!option || !map) return;
@@ -108,9 +113,48 @@ const SearchField: React.FC<SearchFieldProps> = ({
     });
   };
 
+  /* Allows user to hit enter for search instead of only selecting from the dropdown suggestions */
+  const handleKeyPress = async (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" && inputValue) {
+      const results = await provider.search({ query: inputValue });
+      if (results.length > 0) {
+        const firstResult = results[0];
+        const latLng = L.latLng(firstResult.y, firstResult.x);
+        setCenter(latLng);
+
+        setMarkers((prevMarkers) => {
+          if (prevMarkers.length >= maxMarkers) {
+            setOpenSnackbarMaxArray(true);
+            return prevMarkers;
+          }
+
+          const newMarker = {
+            id: self.crypto.randomUUID(),
+            name: firstResult.label,
+            position: latLng,
+            searchLocation: latLng,
+          };
+
+          const isDuplicate = prevMarkers.some(
+            (marker) =>
+              marker.name.toLowerCase() === newMarker.name.toLowerCase(),
+          );
+
+          return isDuplicate ? prevMarkers : [...prevMarkers, newMarker];
+        });
+      } else {
+        setSnackbarNoResults(true);
+      }
+    }
+  };
+
+  const triggerSnackbarClose = () =>
+    handleSnackbarClose(snackbarStates, setSnackbarStates);
+
   return (
     <div style={{ paddingLeft: "0.5em" }}>
       <Autocomplete
+        onKeyDown={handleKeyPress}
         freeSolo
         options={options}
         inputValue={inputValue}
@@ -119,6 +163,9 @@ const SearchField: React.FC<SearchFieldProps> = ({
         }}
         getOptionLabel={(option) =>
           typeof option === "string" ? option : option.label
+        }
+        getOptionKey={(option) =>
+          typeof option === "string" ? option : option.id
         }
         onChange={(e, option) => {
           if (option && typeof option !== "string" && "value" in option) {
@@ -151,14 +198,31 @@ const SearchField: React.FC<SearchFieldProps> = ({
           />
         )}
       />
-      <Snackbar open={openSnackbarMaxArray} onClose={handleSnackbarClose}>
+      <Snackbar
+        open={openSnackbarMaxArray}
+        onClose={triggerSnackbarClose}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
         <Alert
-          onClose={handleSnackbarClose}
+          onClose={triggerSnackbarClose}
           severity="warning"
           variant="filled"
           sx={{ width: "100%" }}
         >
           Please delete an old marker before a new one can be added.
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={openSnackbarNoResults}
+        onClose={triggerSnackbarClose}
+        anchorOrigin={{ vertical: "top", horizontal: "left" }}
+      >
+        <Alert
+          onClose={triggerSnackbarClose}
+          severity="warning"
+          variant="filled"
+        >
+          Landmark not found. Please try a different search term.
         </Alert>
       </Snackbar>
     </div>

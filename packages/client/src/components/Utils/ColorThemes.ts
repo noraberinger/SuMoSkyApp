@@ -1,7 +1,7 @@
 import { createTheme } from "@mui/material";
 
 /** For inclusiveness reasons chose not to select green and red for positive and negative actions at the same time => color blindness
- * Used https://www.colorhexa.com to check colors.
+ * Used https://www.colorhexa.com to check colors to ensure web safe and inclusiveness.
  */
 export const positiveActions = createTheme({
   palette: {

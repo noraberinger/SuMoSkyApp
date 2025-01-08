@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Snackbar, Fab, ThemeProvider, Alert } from "@mui/material/";
+import { Snackbar, Fab, ThemeProvider, Alert, Portal } from "@mui/material/";
 import { handleSnackbarClose } from "./Utils/Calc";
 import { Plan } from "./DTLLoadDelete";
 import { BookmarkAdd } from "@mui/icons-material/";
@@ -113,7 +113,14 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
         >
           <BookmarkAdd />
         </Fab>
-        <Snackbar open={openSnackbarDTL} onClose={triggerSnackbarClose}>
+      </ThemeProvider>
+      <Portal>
+        <Snackbar
+          open={openSnackbarDTL}
+          onClose={triggerSnackbarClose}
+          autoHideDuration={6000}
+          anchorOrigin={{ vertical: "top", horizontal: "left" }}
+        >
           <Alert
             onClose={triggerSnackbarClose}
             severity="success"
@@ -123,7 +130,7 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
             Saved current Date, Time and Location.
           </Alert>
         </Snackbar>
-      </ThemeProvider>
+      </Portal>
     </div>
   );
 };

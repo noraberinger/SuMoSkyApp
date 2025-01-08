@@ -9,7 +9,7 @@ import {
   AttributionControl,
 } from "react-leaflet";
 import L, { LatLngExpression } from "leaflet";
-import { Button, Snackbar, ThemeProvider, Alert } from "@mui/material";
+import { Button, Snackbar, ThemeProvider, Alert, Portal } from "@mui/material";
 import { handleSnackbarClose } from "./Utils/Calc";
 import { functionalities } from "./Utils/ColorThemes";
 import { Room as MarkerIcon } from "@mui/icons-material";
@@ -32,7 +32,7 @@ interface LeafletMapProps extends LeafletMapSetterProps {
   setMarkers: React.Dispatch<React.SetStateAction<Marker[]>>;
 }
 
-/** Setting the mapRef.current to the map object, making the map accessible from other components.  */
+/* Setting the mapRef.current to the map object, making the map accessible from other components.  */
 const MapSetter = ({
   mapRef,
   landmark: center,
@@ -46,7 +46,7 @@ const MapSetter = ({
     setCenter(map.getCenter());
   }, [map, mapRef, setCenter]);
 
-  /** Runs whenever center changes. Updates map view to the center -> e.g. moving to the location passed over the SearchField. */
+  /* Runs whenever center changes. Updates map view to the current center respectively the selected landmark. */
   useEffect(() => {
     if (center) map.setView(center, 13);
   }, [center, map]);
@@ -98,7 +98,6 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
   setCenter,
   setMarkers,
 }) => {
-  /** Logic for deleting a preexisting marker. */
   const [inDeletionMode, setDeletionMode] = useState(false);
   const [openSnackbarDel, setOpenSnackbarDel] = useState(false);
   const [openSnackbarGoLocation, setOpenSnackbarGoLocation] = useState(false);
@@ -237,7 +236,11 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
           </Button>
         </ThemeProvider>
       </div>
-      <Snackbar open={openSnackbarDel} onClose={triggerSnackbarClose}>
+      <Snackbar
+        open={openSnackbarDel}
+        onClose={triggerSnackbarClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
         <Alert
           onClose={triggerSnackbarClose}
           severity="info"
@@ -248,16 +251,22 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
           remove.
         </Alert>
       </Snackbar>
-      <Snackbar open={openSnackbarGoLocation} onClose={triggerSnackbarClose}>
-        <Alert
+      <Portal>
+        <Snackbar
+          open={openSnackbarGoLocation}
           onClose={triggerSnackbarClose}
-          severity="info"
-          variant="filled"
-          sx={{ width: "100%" }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
-          Moving to location of clicked marker...
-        </Alert>
-      </Snackbar>
+          <Alert
+            onClose={triggerSnackbarClose}
+            severity="info"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            Moving to location of clicked marker...
+          </Alert>
+        </Snackbar>
+      </Portal>
     </MapContainer>
   );
 };

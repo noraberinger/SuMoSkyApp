@@ -28,7 +28,7 @@ const getAmPm = (timeString: string) => {
 };
 
 /**
- * @returns Accordion showing interesting photofeatures.
+ * @returns Accordion showing interesting times used in Photography.
  * Includes golden hour, blue hour, moon phases and supermoon text if supermoon.
  */
 const PhotoFeatures: React.FC<PhotoFeatureProps> = ({

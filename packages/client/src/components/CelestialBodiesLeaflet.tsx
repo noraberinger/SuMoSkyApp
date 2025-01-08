@@ -32,7 +32,7 @@ interface CelestialBodiesProps {
   setIsSupermoon: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-/** Returns object with sun altitude above horizon and sun azimuth. Both in radians. */
+/* Returns Sun and Moon object with altitude angle and azimuth angle. Both in radians. */
 const calculateSunPosition = (
   lat: number,
   lng: number,
@@ -64,7 +64,8 @@ const calculateMoonPosition = (
   return { azimuth, altitude, distance };
 };
 
-/** Issue when calculating times using suncalc => if moon sets on the previous or next calendar day suncalc.getMoonTimes returns undefined
+/** Issue when calculating times using suncalc =>
+ *  if moon sets on the previous or next calendar day suncalc.getMoonTimes returns undefined: https://github.com/mourner/suncalc/issues/163
  *  Astronomy engine is used to calculate moon rise and set times, as a workaround. */
 const calculateMoonTimes = (
   body: Astronomy.Body,
@@ -132,7 +133,7 @@ const getAnchorPoint = (
   azimuth: number,
   distance: number,
 ): { lat: number; lng: number } => {
-  /** For spherical calc. */
+  /* For spherical calc. */
   const radiusEarth = 6371e3;
   const angularDistance = distance / radiusEarth;
   const adjustedAzimuth = (azimuth + Math.PI) % (2 * Math.PI);
@@ -140,7 +141,7 @@ const getAnchorPoint = (
   const latRadians = (lat * Math.PI) / 180;
   const lngRadians = (lng * Math.PI) / 180;
 
-  /** Coordinates of 2nd point. */
+  /* Coordinates of 2nd point. */
   const lat2 = Math.asin(
     Math.sin(latRadians) * Math.cos(angularDistance) +
       Math.cos(latRadians) *
@@ -159,7 +160,7 @@ const getAnchorPoint = (
   return { lat: (lat2 * 180) / Math.PI, lng: (lng2 * 180) / Math.PI };
 };
 
-/** Helper functions for drawing of Sun, Moon Map Objects */
+/* Helper functions for drawing of Sun, Moon Map Objects */
 const drawCircle = (
   lat: number,
   lng: number,

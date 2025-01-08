@@ -20,6 +20,10 @@ To run the example data follow these steps:
 - Execute `npm install` in order to install the required node_modules.
 - Execute `npm start` in order to start the server at localhost:3000.
 
+## Changes Terrender
+Camera.js in calculateMatrices changed (this.projectionMatrix = m4.perspective(this.#fov, this.gl.canvas.width / this.gl.canvas.height, 0.01, 1000);
+to (this.projectionMatrix = m4.perspective(this.#fov, this.gl.canvas.width / this.gl.canvas.height,  0.0001, 100);
+
 ## License
 This project is licensed under the MIT License.
 For any Weather Data: Data provided by Open-Meteo, licensed under CC-BY 4.0
