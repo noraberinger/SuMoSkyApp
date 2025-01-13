@@ -17,6 +17,11 @@ import Compass from "./Compass";
 import CelestialBodies from "./Utils/CelestialBodies";
 import Tracing from "./Utils/Tracing";
 
+/* When this zCoord is 1, Camera is at Horizon line => acts as a proportional offset */
+const camHeightMultiplier = 1;
+/* Time offsets in minutes for tracing => currently over interval of 1 hour 6 triangles are created */
+const timeOffsets = [-30, -20, -10, 0, 10, 20, 30];
+
 /* Helper functions calculating Sun and Moon Angles azimuth (horizontal angle) and altitude in radians */
 const getSunAngles = (
   landmark: { lat: number; lng: number },
@@ -126,11 +131,6 @@ class CustomTerrender extends Terrender {
     }
   };
 }
-
-/* When this zCoord is 1, Camera is at Horizon line => acts as a proportional offset */
-const camHeightMultiplier = 1;
-/* Time offsets in minutes for tracing => currently over interval of 1 hour 6 triangles are created */
-const timeOffsets = [-30, -20, -10, 0, 10, 20, 30];
 
 /**
  * @returns TerrenderCanvas
@@ -694,8 +694,8 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
             variant="filled"
             sx={{ width: "100%" }}
           >
-            Blue triangles on terrain show moon position over time frame ±30
-            minutes from current time. <br />
+            Blue triangles on terrain trace the moon position over a time frame
+            ±30 minutes from current time. <br />
             Only visible when moon is above horizon. <br />
             If not visible, when moon is above horizon, please move around the
             terrain to make them appear in your field of view.
@@ -713,8 +713,8 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
             variant="filled"
             sx={{ width: "100%" }}
           >
-            Yellow triangles on terrain show sun position over time frame ±30
-            minutes from current time. <br />
+            Yellow triangles on terrain trace the sun position over a time frame
+            ±30 minutes from current time. <br />
             Only visible when sun is above horizon. <br />
             If not visible, when sun is above horizon, please move around the
             terrain to make them appear in your field of view.

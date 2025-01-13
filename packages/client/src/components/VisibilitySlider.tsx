@@ -1,5 +1,5 @@
 /* Data provided by Open-Meteo, licensed under CC-BY 4.0 */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Slider, Snackbar, Alert, Typography, Portal } from "@mui/material";
 import { LatLngExpression } from "leaflet";
 import {
@@ -101,18 +101,42 @@ const useVisibilityData = (
   return visibilityData;
 };
 
-const getHourlyEpoch = (currentTime: Date) => {
-  //TODO checkout linear interpolation
-  const epochSeconds = Math.trunc(currentTime.valueOf() / 1000);
+/* Visibility data interpolated */
+const getVisibility = (
+  visibility: VisibilityByHour | undefined,
+  dateTime: Date,
+): number | undefined => {
+  /* Get epoch seconds for current time */
+  const epochSeconds = Math.trunc(dateTime.valueOf() / 1000);
 
+  /* Get the start of the current hour and next hour */
   const secondsPastHour = epochSeconds % (60 * 60);
+  const currentHourEpoch = epochSeconds - secondsPastHour;
+  const nextHourEpoch = currentHourEpoch + 60 * 60;
 
-  const roundedHourUp = epochSeconds + (60 * 60 - secondsPastHour);
-  //const roundedHourDown = epochSeconds - secondsPastHour;
-  //const ratio = secondsPastHour / (60 * 60);
-  //const interpolated = roundedHourDown + ratio * (roundedHourUp - roundedHourDown);
+  /* Get visibility values for both hours */
+  const currentHourVisibility = visibility?.[currentHourEpoch];
+  const nextHourVisibility = visibility?.[nextHourEpoch];
 
-  return roundedHourUp;
+  /* Handle cases where one or both values are missing */
+  if (currentHourVisibility === undefined && nextHourVisibility === undefined) {
+    return undefined;
+  }
+  if (currentHourVisibility === undefined) {
+    return nextHourVisibility;
+  }
+  if (nextHourVisibility === undefined) {
+    return currentHourVisibility;
+  }
+
+  /* Calculate interpolation factor from 0 (start of hour) to 1 (end of hour) */
+  const interpolationFactor = secondsPastHour / (60 * 60);
+
+  /* Perform linear interpolation */
+  return (
+    currentHourVisibility +
+    (nextHourVisibility - currentHourVisibility) * interpolationFactor
+  );
 };
 
 /**
@@ -128,9 +152,10 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   selectedDate,
   sliderTime,
 }) => {
-  const [openSnackbarForecast, setOpenSnackbarForecast] = useState(false);
-  const snackbarStates = { openSnackbarForecast };
-  const setSnackbarStates = { openSnackbarForecast: setOpenSnackbarForecast };
+  const [openSnackbarNoForecast, setOpenSnackbarNoForecast] = useState(false);
+  const snackbarStates = { openSnackbarForecast: openSnackbarNoForecast };
+  const setSnackbarStates = { openSnackbarForecast: setOpenSnackbarNoForecast };
+  const isMounted = useRef(false);
 
   const handleChange = (_: Event, newValue: number | number[]) => {
     onChange(linearToLog(newValue as number));
@@ -145,13 +170,20 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
     handleSnackbarClose(snackbarStates, setSnackbarStates);
   };
 
-  const noVisibilityValue =
-    visibility && !visibility[getHourlyEpoch(currentTime)];
+  const visibilityValue = useMemo(
+    () => getVisibility(visibility, currentTime),
+    [visibility, currentTime],
+  );
+
   useEffect(() => {
-    if (noVisibilityValue) {
-      setOpenSnackbarForecast(true);
+    if (isMounted.current) {
+      if (!visibilityValue) {
+        setOpenSnackbarNoForecast(true);
+      }
+    } else {
+      isMounted.current = true;
     }
-  }, [noVisibilityValue]);
+  }, [visibilityValue]);
 
   return (
     <>
@@ -179,17 +211,16 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
           },
         })}
       />
-      {!noVisibilityValue && (
+      {visibilityValue && (
         <div style={{ color: "white", marginTop: "1em" }}>
           <Typography>
-            Current Visibility Distance:{" "}
-            {visibility?.[getHourlyEpoch(currentTime)]}m
+            Current Visibility Distance: {Math.round(visibilityValue)}m
           </Typography>
         </div>
       )}
       <Portal>
         <Snackbar
-          open={openSnackbarForecast}
+          open={openSnackbarNoForecast}
           onClose={triggerSnackbarClose}
           anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >

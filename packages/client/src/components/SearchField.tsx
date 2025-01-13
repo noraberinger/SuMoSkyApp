@@ -62,22 +62,34 @@ const SearchField: React.FC<SearchFieldProps> = ({
     openSnackbarNoResults: setSnackbarNoResults,
     openSnackbarMaxArray: setOpenSnackbarMaxArray,
   };
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
 
   const debouncedInput = useDebounce(inputValue, 300);
 
   useEffect(() => {
-    if (debouncedInput) {
+    if (debouncedInput?.trim()) {
       const searchLocations = async (input: string) => {
-        const results = await provider.search({ query: input });
-        setOptions(
-          results.map((result) => ({
-            label: result.label,
-            value: { x: result.x, y: result.y },
-            id: `${result.label}-${result.x}-${result.y}`,
-          })),
-        );
+        setIsSearching(true);
+        try {
+          const results = await provider.search({ query: input });
+          setOptions(
+            results.map((result) => ({
+              label: result.label,
+              value: { x: result.x, y: result.y },
+              id: `${result.label}-${result.x}-${result.y}`,
+            })),
+          );
+        } catch (error) {
+          console.error("Search failed: ", error);
+          setSearchError(true);
+        } finally {
+          setIsSearching(false);
+        }
       };
       searchLocations(debouncedInput);
+    } else {
+      setOptions([]);
     }
   }, [debouncedInput, provider]);
 
@@ -115,9 +127,15 @@ const SearchField: React.FC<SearchFieldProps> = ({
 
   /* Allows user to hit enter for search instead of only selecting from the dropdown suggestions */
   const handleKeyPress = async (event: React.KeyboardEvent) => {
-    if (event.key === "Enter" && inputValue) {
-      const results = await provider.search({ query: inputValue });
-      if (results.length > 0) {
+    if (event.key === "Enter" && inputValue.trim()) {
+      setIsSearching(true);
+      try {
+        const results = await provider.search({ query: inputValue });
+        if (results.length === 0) {
+          setSnackbarNoResults(true);
+          return;
+        }
+
         const firstResult = results[0];
         const latLng = L.latLng(firstResult.y, firstResult.x);
         setCenter(latLng);
@@ -142,8 +160,11 @@ const SearchField: React.FC<SearchFieldProps> = ({
 
           return isDuplicate ? prevMarkers : [...prevMarkers, newMarker];
         });
-      } else {
-        setSnackbarNoResults(true);
+      } catch (error) {
+        console.error("Search failed: ", error);
+        setSearchError(true);
+      } finally {
+        setIsSearching(false);
       }
     }
   };
@@ -197,6 +218,8 @@ const SearchField: React.FC<SearchFieldProps> = ({
             }}
           />
         )}
+        loading={isSearching}
+        loadingText="Searching..."
       />
       <Snackbar
         open={openSnackbarMaxArray}
@@ -223,6 +246,15 @@ const SearchField: React.FC<SearchFieldProps> = ({
           variant="filled"
         >
           Landmark not found. Please try a different search term.
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={searchError}
+        onClose={() => setSearchError(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert severity="error" onClose={() => setSearchError(false)}>
+          Search failed. Please try again.
         </Alert>
       </Snackbar>
     </div>

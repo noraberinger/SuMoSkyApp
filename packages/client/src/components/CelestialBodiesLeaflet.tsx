@@ -8,6 +8,18 @@ import {
   calculateSunTimes,
 } from "./Utils/Calc";
 
+/* Boundaries for moon phases */
+const MOON_PHASES = {
+  NEW_MOON: { min: 0.97, max: 0.03 },
+  WAXING_CRESCENT: { min: 0.03, max: 0.22 },
+  FIRST_QUARTER: { min: 0.22, max: 0.28 },
+  WAXING_GIBBOUS: { min: 0.28, max: 0.47 },
+  FULL_MOON: { min: 0.47, max: 0.53 },
+  WANING_GIBBOUS: { min: 0.53, max: 0.72 },
+  LAST_QUARTER: { min: 0.72, max: 0.78 },
+  WANING_CRESCENT: { min: 0.78, max: 0.97 },
+} as const;
+
 interface CelestialBodiesProps {
   mapRef: React.MutableRefObject<L.Map | null>;
   landmark: L.LatLngExpression | undefined;
@@ -87,42 +99,99 @@ const calculateMoonPhase = (date: Date): { phase: number } => {
   return { phase: illumination.phase };
 };
 
-//TODO supermoon can also be a new moon
-const fullMoonTreshold = [0.48, 0.53];
-//TODO Find better treshholds
 const getMoonPhase = (phase: number): string => {
-  if (phase === 0) return "New Moon";
-  if (phase === 0.25) return "First Quarter";
-  if ((phase >= fullMoonTreshold[0], phase <= fullMoonTreshold[1]))
+  const normalizedPhase = phase % 1;
+
+  if (
+    normalizedPhase >= MOON_PHASES.NEW_MOON.min ||
+    normalizedPhase <= MOON_PHASES.NEW_MOON.max
+  ) {
+    return "New Moon";
+  }
+
+  if (
+    normalizedPhase >= MOON_PHASES.WAXING_CRESCENT.min &&
+    normalizedPhase <= MOON_PHASES.WAXING_CRESCENT.max
+  ) {
+    return "Waxing Crescent";
+  }
+
+  if (
+    normalizedPhase >= MOON_PHASES.FIRST_QUARTER.min &&
+    normalizedPhase <= MOON_PHASES.FIRST_QUARTER.max
+  ) {
+    return "First Quarter";
+  }
+
+  if (
+    normalizedPhase >= MOON_PHASES.WAXING_GIBBOUS.min &&
+    normalizedPhase <= MOON_PHASES.WAXING_GIBBOUS.max
+  ) {
+    return "Waxing Gibbous";
+  }
+
+  if (
+    normalizedPhase >= MOON_PHASES.FULL_MOON.min &&
+    normalizedPhase <= MOON_PHASES.FULL_MOON.max
+  ) {
     return "Full Moon";
-  if (phase === 0.75) return "Last Quarter";
-  if (phase > 0 && phase < 0.25) return "Waxing Crescent";
-  if (phase > 0.25 && phase < 0.48) return "Waxing Gibbous";
-  if (phase > 0.53 && phase < 0.75) return "Waning Gibbous";
-  if (phase > 0.75 && phase < 1) return "Waning Crescent";
+  }
+
+  if (
+    normalizedPhase >= MOON_PHASES.WANING_GIBBOUS.min &&
+    normalizedPhase <= MOON_PHASES.WANING_GIBBOUS.max
+  ) {
+    return "Waning Gibbous";
+  }
+
+  if (
+    normalizedPhase >= MOON_PHASES.LAST_QUARTER.min &&
+    normalizedPhase <= MOON_PHASES.LAST_QUARTER.max
+  ) {
+    return "Last Quarter";
+  }
+
+  if (
+    normalizedPhase >= MOON_PHASES.WANING_CRESCENT.min &&
+    normalizedPhase <= MOON_PHASES.WANING_CRESCENT.max
+  ) {
+    return "Waning Crescent";
+  }
 
   console.warn("Moon phases not ready.");
   return "";
 };
 
-//TODO: find good numbers, check if correct for new moon phase as well
-const calculateSupermoon = (distance: number, phase: number): boolean => {
-  /** 
-  SearchLunarApis(date now); => future or past date Apsis, kind.pericenter, distance km
-  if pericenter => threshold > distance now/kind.pericenter.distance then supermoon percentage
-  else apicenter aka moon moving away => find closest point in past, half of cyyle find SearchLunarApsis()
-  actual distance if in 90% then supermoon
-  */
+const calculateSupermoon = (date: Date, phase: number): boolean => {
+  const perigee = 356907;
+  const threshold = 0.9;
+  const dayMs = 24 * 60 * 60 * 1000;
 
-  const perigge = 356907;
-  const treshold = 12000;
+  const formatDate = (date: Date): string => {
+    return date.toISOString().split("T")[0];
+  };
 
+  /* Find perigee or apogee after current date => search for nearest apsis one day before selected date */
+  const searchDate = new Date(date.toISOString().split("T")[0]);
+  const searchDateMin1Day = new Date(searchDate.getTime() - dayMs);
+
+  const nearestApsis = Astronomy.SearchLunarApsis(searchDateMin1Day);
+  const nearestApsisDate = new Date(nearestApsis.time.date);
+
+  const currentPhase = getMoonPhase(phase);
+
+  /* If the distance in km matches within 90% of the perigee distance, it is a supermoon */
   if (
-    Math.abs(distance - perigge) <= treshold &&
-    phase >= fullMoonTreshold[0] &&
-    phase <= fullMoonTreshold[1]
+    (nearestApsis.kind === Astronomy.ApsisKind.Pericenter &&
+      formatDate(nearestApsisDate) === formatDate(searchDate) &&
+      currentPhase === "Full Moon") ||
+    (nearestApsis.kind === Astronomy.ApsisKind.Pericenter &&
+      formatDate(nearestApsisDate) === formatDate(searchDate) &&
+      currentPhase === "New Moon")
   ) {
-    return true;
+    const distanceRatio = nearestApsis.dist_km / perigee;
+
+    return distanceRatio >= threshold;
   }
   return false;
 };
@@ -251,6 +320,7 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
     if (center) {
       const { lat, lng } = convertLatLngToCoords(center);
       const sliderDateTime = convertDateTime(date, time);
+      const currentDate = date;
 
       const positionSun = calculateSunPosition(lat, lng, sliderDateTime);
       const sunTimes = calculateSunTimes(lat, lng, date);
@@ -288,6 +358,7 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
         moonPhase,
         sunbeamDistance,
         moonbeamDistance,
+        currentDate,
       };
     }
     return undefined;
@@ -297,7 +368,7 @@ export const CelestialBodiesLeaflet: React.FC<CelestialBodiesProps> = ({
     if (mapRef.current && center && celestialBodies) {
       setIsSupermoon(
         calculateSupermoon(
-          celestialBodies.positionMoon.distance,
+          celestialBodies.currentDate,
           celestialBodies.moonPhase.phase,
         ),
       );
