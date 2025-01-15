@@ -398,40 +398,42 @@ const App: React.FC = () => {
                 setElevationCurrentCenter={setElevationCurrentCenter}
                 elevationCurrentCenter={elevationCurrentCenter}
               />
-              <ThemeProvider theme={tooltipTheme}>
-                <Tooltip
-                  title={
-                    <>
-                      <Typography>
-                        Toggle Elevation and Visibility Sliders
-                      </Typography>
-                    </>
-                  }
-                  arrow
-                  placement="left"
-                >
-                  <Fab
-                    aria-label="Elevation/Visibility"
-                    onClick={handleFabClick}
-                    sx={{
-                      color: "#fff",
-                      backgroundColor: "#878787",
-                      position: "absolute",
-                      bottom: 60,
-                      right: "1em",
-                      zIndex: 1500,
-                      border: "2px solid",
-                      borderColor: "grey.700",
-                      "&:hover": {
-                        boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.7)",
-                        transition: "all 0.2s ease-in-out",
-                      },
-                    }}
+              {!toggledTopDown && (
+                <ThemeProvider theme={tooltipTheme}>
+                  <Tooltip
+                    title={
+                      <>
+                        <Typography>
+                          Toggle Elevation and Visibility Sliders
+                        </Typography>
+                      </>
+                    }
+                    arrow
+                    placement="left"
                   >
-                    <TuneIcon />
-                  </Fab>
-                </Tooltip>
-              </ThemeProvider>
+                    <Fab
+                      aria-label="Elevation/Visibility"
+                      onClick={handleFabClick}
+                      sx={{
+                        color: "#fff",
+                        backgroundColor: "#878787",
+                        position: "absolute",
+                        bottom: 60,
+                        right: "1em",
+                        zIndex: 1500,
+                        border: "2px solid",
+                        borderColor: "grey.700",
+                        "&:hover": {
+                          boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.7)",
+                          transition: "all 0.2s ease-in-out",
+                        },
+                      }}
+                    >
+                      <TuneIcon />
+                    </Fab>
+                  </Tooltip>
+                </ThemeProvider>
+              )}
             </>
           ) : (
             <div>Loading config</div>

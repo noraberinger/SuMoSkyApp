@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Snackbar, Fab, ThemeProvider, Alert, Portal } from "@mui/material/";
-import { handleSnackbarClose } from "./Utils/Calc";
 import { Plan } from "./DTLLoadDelete";
 import { BookmarkAdd } from "@mui/icons-material/";
 import { positiveActions } from "./Utils/ColorThemes";
@@ -77,8 +76,8 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
   setSavedPlans,
 }) => {
   const [openSnackbarDTL, setOpenSnackbarDTL] = useState(false);
-  const snackbarStates = { openSnackbarDTL };
-  const setSnackbarStates = { openSnackbarDTL: setOpenSnackbarDTL };
+
+  const closeSnackbarDTL = () => setOpenSnackbarDTL(false);
 
   const { handleSaveDTL } = localStorageHandler({
     landmark: center,
@@ -86,8 +85,6 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
     time,
     setSavedPlans,
   });
-  const triggerSnackbarClose = () =>
-    handleSnackbarClose(snackbarStates, setSnackbarStates);
 
   return (
     <div>
@@ -117,12 +114,12 @@ const DTLSave: React.FC<StorageHandlerProps> = ({
       <Portal>
         <Snackbar
           open={openSnackbarDTL}
-          onClose={triggerSnackbarClose}
+          onClose={closeSnackbarDTL}
           autoHideDuration={6000}
           anchorOrigin={{ vertical: "top", horizontal: "left" }}
         >
           <Alert
-            onClose={triggerSnackbarClose}
+            onClose={closeSnackbarDTL}
             severity="success"
             variant="filled"
             sx={{ width: "100%" }}

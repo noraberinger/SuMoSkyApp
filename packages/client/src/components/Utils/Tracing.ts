@@ -121,6 +121,10 @@ class Tracing {
     if (this.program && this.vertexBuffer && vertices && vertices.length > 0) {
       this.gl.useProgram(this.program);
 
+      /* Depth handling */
+      this.gl.enable(this.gl.DEPTH_TEST);
+      this.gl.depthFunc(this.gl.LEQUAL);
+
       /* Transparency Handling */
       this.gl.enable(this.gl.BLEND);
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
@@ -161,6 +165,7 @@ class Tracing {
       }
 
       this.gl.disable(this.gl.BLEND);
+      this.gl.disable(this.gl.DEPTH_TEST);
     }
   }
 

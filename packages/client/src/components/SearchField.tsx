@@ -10,7 +10,6 @@ import {
 import L from "leaflet";
 import { Marker } from "./LeafletMap";
 import { OpenStreetMapProvider } from "leaflet-geosearch";
-import { handleSnackbarClose } from "./Utils/Calc";
 
 interface SearchOption {
   label: string;
@@ -57,13 +56,11 @@ const SearchField: React.FC<SearchFieldProps> = ({
   const [inputValue, setInputValue] = useState<string>("");
   const [openSnackbarNoResults, setSnackbarNoResults] = useState(false);
   const [openSnackbarMaxArray, setOpenSnackbarMaxArray] = useState(false);
-  const snackbarStates = { openSnackbarNoResults, openSnackbarMaxArray };
-  const setSnackbarStates = {
-    openSnackbarNoResults: setSnackbarNoResults,
-    openSnackbarMaxArray: setOpenSnackbarMaxArray,
-  };
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
+
+  const closeSnackbarMaxArray = () => setOpenSnackbarMaxArray(false);
+  const closeSnackbarNoResults = () => setSnackbarNoResults(false);
 
   const debouncedInput = useDebounce(inputValue, 300);
 
@@ -169,9 +166,6 @@ const SearchField: React.FC<SearchFieldProps> = ({
     }
   };
 
-  const triggerSnackbarClose = () =>
-    handleSnackbarClose(snackbarStates, setSnackbarStates);
-
   return (
     <div style={{ paddingLeft: "0.5em" }}>
       <Autocomplete
@@ -223,11 +217,11 @@ const SearchField: React.FC<SearchFieldProps> = ({
       />
       <Snackbar
         open={openSnackbarMaxArray}
-        onClose={triggerSnackbarClose}
+        onClose={closeSnackbarMaxArray}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
-          onClose={triggerSnackbarClose}
+          onClose={closeSnackbarMaxArray}
           severity="warning"
           variant="filled"
           sx={{ width: "100%" }}
@@ -237,11 +231,11 @@ const SearchField: React.FC<SearchFieldProps> = ({
       </Snackbar>
       <Snackbar
         open={openSnackbarNoResults}
-        onClose={triggerSnackbarClose}
+        onClose={closeSnackbarNoResults}
         anchorOrigin={{ vertical: "top", horizontal: "left" }}
       >
         <Alert
-          onClose={triggerSnackbarClose}
+          onClose={closeSnackbarNoResults}
           severity="warning"
           variant="filled"
         >

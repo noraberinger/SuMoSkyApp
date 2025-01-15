@@ -10,7 +10,6 @@ import {
 } from "react-leaflet";
 import L, { LatLngExpression } from "leaflet";
 import { Button, Snackbar, ThemeProvider, Alert, Portal } from "@mui/material";
-import { handleSnackbarClose } from "./Utils/Calc";
 import { functionalities } from "./Utils/ColorThemes";
 import { Room as MarkerIcon } from "@mui/icons-material";
 
@@ -101,11 +100,9 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
   const [inDeletionMode, setDeletionMode] = useState(false);
   const [openSnackbarDel, setOpenSnackbarDel] = useState(false);
   const [openSnackbarGoLocation, setOpenSnackbarGoLocation] = useState(false);
-  const snackbarStates = { openSnackbarDel, openSnackbarGoLocation };
-  const setSnackbarStates = {
-    openSnackbarDel: setOpenSnackbarDel,
-    openSnackbarGoLocation: setOpenSnackbarGoLocation,
-  };
+
+  const closeSnackbarDel = () => setOpenSnackbarDel(false);
+  const closeSnackbarGoLocation = () => setOpenSnackbarGoLocation(false);
 
   const deleteMarker = (markerId: string) => {
     setMarkers((prevMarkers) =>
@@ -136,9 +133,6 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       }
     }
   };
-
-  const triggerSnackbarClose = () =>
-    handleSnackbarClose(snackbarStates, setSnackbarStates);
 
   return (
     <MapContainer
@@ -238,11 +232,11 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       </div>
       <Snackbar
         open={openSnackbarDel}
-        onClose={triggerSnackbarClose}
+        onClose={closeSnackbarDel}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={triggerSnackbarClose}
+          onClose={closeSnackbarDel}
           severity="info"
           variant="filled"
           sx={{ width: "100%" }}
@@ -254,11 +248,11 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       <Portal>
         <Snackbar
           open={openSnackbarGoLocation}
-          onClose={triggerSnackbarClose}
+          onClose={closeSnackbarGoLocation}
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
           <Alert
-            onClose={triggerSnackbarClose}
+            onClose={closeSnackbarGoLocation}
             severity="info"
             variant="filled"
             sx={{ width: "100%" }}

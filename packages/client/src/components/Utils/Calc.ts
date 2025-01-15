@@ -59,21 +59,7 @@ export const calculateSunTimes = (
   };
 };
 
-/* Helper function closing any Snackbar */
-export const handleSnackbarClose = (
-  snackbarStates: { [key: string]: boolean },
-  setSnackbarStates: {
-    [key: string]: React.Dispatch<React.SetStateAction<boolean>>;
-  },
-) => {
-  Object.keys(snackbarStates).forEach((key) => {
-    if (snackbarStates[key]) {
-      setSnackbarStates[key](false);
-    }
-  });
-};
-
-const toRad = (degrees: number): number => {
+export const toRad = (degrees: number): number => {
   return (degrees * Math.PI) / 180;
 };
 
@@ -115,3 +101,41 @@ export const translateCoords = (
 
 export const normalizeDegrees = (angle: number): number =>
   ((angle % 360) + 360) % 360;
+
+/* Rotate around up vector of camera */
+export const getTopDownUpVec = (direction: number) => {
+  /* Compass direction in radians */
+  const normalizedDeg = normalizeDegrees(direction);
+  const angleRadians = toRad(normalizedDeg);
+
+  return [Math.sin(angleRadians), Math.cos(angleRadians), 0];
+};
+
+/* Rotate camera around target */
+export const calculateCamTarget = (
+  direction: number,
+  distance: number,
+  z: number,
+  position: number[],
+) => {
+  /* Compass direction in radians */
+  const normalizedDeg = normalizeDegrees(direction);
+  const angleInRadians = toRad(normalizedDeg);
+
+  /* Movement of Camera, reflecting 360° rotation, with some distance */
+  const newTargetX = position[0] + distance * Math.sin(angleInRadians);
+  const newTargetY = position[1] + distance * Math.cos(angleInRadians);
+
+  return [newTargetX, newTargetY, z];
+};
+
+/* Calculates current distance between Camera and Target */
+export const positionTargetDistance = (
+  position: number[],
+  target: number[],
+) => {
+  const radius = Math.sqrt(
+    (position[0] - target[0]) ** 2 + (position[1] - target[1]) ** 2,
+  );
+  return radius;
+};

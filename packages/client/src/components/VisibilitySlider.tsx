@@ -1,12 +1,8 @@
 /* Data provided by Open-Meteo, licensed under CC-BY 4.0 */
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Slider, Snackbar, Alert, Typography, Portal } from "@mui/material";
 import { LatLngExpression } from "leaflet";
-import {
-  convertDateTime,
-  convertLatLngToCoords,
-  handleSnackbarClose,
-} from "./Utils/Calc";
+import { convertDateTime, convertLatLngToCoords } from "./Utils/Calc";
 
 interface VisibilitySliderProps {
   value: number;
@@ -21,21 +17,21 @@ interface VisibilitySliderProps {
  *  - High values = large steps
  */
 const marks = [
-  { value: 0, label: "0m" },
-  { value: 0.5, label: "3m" },
-  { value: 1, label: "10m" },
-  { value: 1.3, label: "20m" },
-  { value: 1.5, label: "30m" },
-  { value: 1.7, label: "50m" },
-  { value: 2, label: "100m" },
-  { value: 2.3, label: "200m" },
-  { value: 2.5, label: "300m" },
-  { value: 2.7, label: "500m" },
-  { value: 3, label: "1000m" },
-  { value: 3.3, label: "2000m" },
-  { value: 3.5, label: "3000m" },
-  { value: 3.7, label: "5000m" },
-  { value: 4, label: "10000m" },
+  { value: 0, label: "0x" },
+  { value: 0.5, label: "3x" },
+  { value: 1, label: "10x" },
+  { value: 1.3, label: "20x" },
+  { value: 1.5, label: "30x" },
+  { value: 1.7, label: "50x" },
+  { value: 2, label: "100x" },
+  { value: 2.3, label: "200x" },
+  { value: 2.5, label: "300x" },
+  { value: 2.7, label: "500x" },
+  { value: 3, label: "1000x" },
+  { value: 3.3, label: "2000x" },
+  { value: 3.5, label: "3000x" },
+  { value: 3.7, label: "5000x" },
+  { value: 4, label: "10000x" },
 ].map((mark) => ({
   ...mark,
   label:
@@ -60,7 +56,7 @@ function linearToLog(linearValue: number) {
 
 /* Converts the values into a string such that screen readers can make use of the numeric value of the slider. */
 function valueText(value: number) {
-  return `${Math.round(linearToLog(value))} m`;
+  return `${Math.round(linearToLog(value))}x`;
 }
 
 /* Fetching of Visibility Forecast */
@@ -153,9 +149,6 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   sliderTime,
 }) => {
   const [openSnackbarNoForecast, setOpenSnackbarNoForecast] = useState(false);
-  const snackbarStates = { openSnackbarForecast: openSnackbarNoForecast };
-  const setSnackbarStates = { openSnackbarForecast: setOpenSnackbarNoForecast };
-  const isMounted = useRef(false);
 
   const handleChange = (_: Event, newValue: number | number[]) => {
     onChange(linearToLog(newValue as number));
@@ -166,9 +159,7 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   const visibility = useVisibilityData(landmark);
 
   /* Snackbar Handling, trigger Snackbar when no forecast available */
-  const triggerSnackbarClose = () => {
-    handleSnackbarClose(snackbarStates, setSnackbarStates);
-  };
+  const handleSnackbarClose = () => setOpenSnackbarNoForecast(false);
 
   const visibilityValue = useMemo(
     () => getVisibility(visibility, currentTime),
@@ -176,14 +167,10 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
   );
 
   useEffect(() => {
-    if (isMounted.current) {
-      if (!visibilityValue) {
-        setOpenSnackbarNoForecast(true);
-      }
-    } else {
-      isMounted.current = true;
+    if (visibility && !visibilityValue) {
+      setOpenSnackbarNoForecast(true);
     }
-  }, [visibilityValue]);
+  }, [visibility, visibilityValue]);
 
   return (
     <>
@@ -221,11 +208,11 @@ const VisibilitySlider: React.FC<VisibilitySliderProps> = ({
       <Portal>
         <Snackbar
           open={openSnackbarNoForecast}
-          onClose={triggerSnackbarClose}
+          onClose={handleSnackbarClose}
           anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
           <Alert
-            onClose={triggerSnackbarClose}
+            onClose={handleSnackbarClose}
             severity="warning"
             variant="filled"
             sx={{ width: "100%" }}

@@ -8,17 +8,26 @@ import SkyQuadBlended from "./Utils/SkyQuadBlended";
 import {
   convertDateTime,
   convertLatLngToCoords,
-  toDeg,
-  translateCoords,
+  //toDeg,
+  //translateCoords,
+  getTopDownUpVec,
+  calculateCamTarget,
+  positionTargetDistance,
 } from "./Utils/Calc";
 import { ThemeProvider, Snackbar, Alert, Portal } from "@mui/material";
 import { functionalities } from "./Utils/ColorThemes";
 import Compass from "./Compass";
 import CelestialBodies from "./Utils/CelestialBodies";
 import Tracing from "./Utils/Tracing";
+import Camera from "terrender-core/src/Utils/Camera";
+import * as twgl from "twgl.js";
+
+/* Added vector types */
+const m4 = twgl.m4;
+const v3 = twgl.v3;
 
 /* When this zCoord is 1, Camera is at Horizon line => acts as a proportional offset */
-const camHeightMultiplier = 1;
+const camHeightMultiplier = 1.25;
 /* Time offsets in minutes for tracing => currently over interval of 1 hour 6 triangles are created */
 const timeOffsets = [-30, -20, -10, 0, 10, 20, 30];
 
@@ -114,6 +123,7 @@ interface TerrenderCanvasProps {
   elevationCurrentCenter: number;
 }
 
+/* Extending Terrender source code such that able to render before terrain is rendered => needed to render SkyQuadBlended and CelestialBodies */
 class CustomTerrender extends Terrender {
   preDrawCallback?: () => void = undefined;
 
@@ -132,6 +142,96 @@ class CustomTerrender extends Terrender {
   };
 }
 
+/* Extending StandardInputHandler in order to make minor changes to provided moveOnViewAxis and moveRelativeToTerrain function */
+class CustomInputHandler extends StandardInputHandler {
+  #camera: Camera;
+  constructor(
+    terrender: Terrender,
+    config?: { sensitivity: number; positionFactor: number },
+  ) {
+    super(terrender, config);
+    this.#camera = terrender.getCamera();
+  }
+
+  /** moveOnViewAxis reimplemented with the change of using lookAt instead of changeCamPosition
+   * - Necessary to keep the correct rotation while zooming in topdown mode
+   * - up vector instead of initialUp vector is used
+   */
+  moveOnViewAxis = (value: number, offsetCenter = [0, 0]) => {
+    value *=
+      Math.sqrt(Math.max(this.#camera.position[2], 0)) * this.positionFactor;
+
+    const rotationAroundUp = m4.axisRotation(
+      this.#camera.up,
+      (-offsetCenter[0] * this.#camera.fov) / 2,
+    );
+    const rotationAroundRight = m4.axisRotation(
+      this.#camera.right,
+      (offsetCenter[1] * this.#camera.vfov) / 2,
+    );
+
+    let changeDirection = m4.transformDirection(
+      rotationAroundRight,
+      this.#camera.viewDirection,
+    );
+    changeDirection = v3.normalize(
+      m4.transformDirection(rotationAroundUp, changeDirection),
+    );
+    const changeVec = v3.mulScalar(changeDirection, value);
+    const newPosition = v3.add(this.#camera.position, changeVec);
+    const newTarget = v3.add(newPosition, this.#camera.viewDirection);
+
+    if (newPosition[2] <= 0) {
+      return;
+    }
+
+    this.#camera.lookAt([...newPosition], [...newTarget], this.#camera.up);
+  };
+
+  /** moveRelativeToTerrain reimplemented with the change of using lookAt instead of changeCamPosition
+   * - Necessary to keep the correct rotation while panning in topdown mode
+   * - up vector instead of initialUp vector is used
+   */
+  moveRelativeToTerrain = (deltaCoords: Array<number>) => {
+    deltaCoords = deltaCoords.map((value) => {
+      return (
+        value * Math.max(this.#camera.position[2], 0) * this.positionFactor
+      );
+    });
+
+    let { right } = this.#camera;
+    let forward = this.isTopDownMode()
+      ? this.#camera.up
+      : this.#camera.viewDirection;
+    right[2] = 0;
+    forward[2] = 0;
+    right = [...v3.mulScalar(v3.normalize(right), deltaCoords[0])];
+    forward = [...v3.mulScalar(v3.normalize(forward), deltaCoords[1])];
+
+    let newPos = v3.add(this.#camera.position, right);
+    newPos = v3.add(newPos, forward);
+    let newTarget = v3.add(this.#camera.target, right);
+    newTarget = v3.add(newTarget, forward);
+    this.#camera.lookAt([...newPos], [...newTarget], this.#camera.up);
+  };
+}
+
+/* Logic for Snackbars such that only activated once */
+const useToggleOnce = (): [boolean, () => void] => {
+  const [toggle, setToggle] = useState(false);
+  const [, setWasToggled] = useState(false);
+
+  const setToggleOnce = useCallback(() => {
+    setToggle((prevValue) => (prevValue ? false : prevValue));
+    setWasToggled((prevValue) => {
+      if (!prevValue) setToggle(true);
+      return true;
+    });
+  }, []);
+
+  return [toggle, setToggleOnce];
+};
+
 /**
  * @returns TerrenderCanvas
  * Canvas Component which renders Terrender fully as is according to config.
@@ -147,23 +247,11 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   toggledTopDown,
   setToggledTopDown,
   setElevationCurrentCenter,
-  elevationCurrentCenter,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const terrenderRef = useRef<CustomTerrender | null>(null);
   const inputHandlerRef = useRef<StandardInputHandler | null>(null);
   const [didInitialDraw, setDidInitialDraw] = useState(false);
-  const [topDownConfigs, setTopDownConfigs] = useState<
-    | {
-        position: number[];
-        target: number[];
-      }
-    | undefined
-  >();
-  const isTopDown = Boolean(topDownConfigs);
-  useEffect(() => {
-    setToggledTopDown(isTopDown);
-  }, [isTopDown, setToggledTopDown]);
 
   /* References for WebGL Objects */
   const skyquadRef = useRef<SkyQuadBlended | null>(null);
@@ -171,6 +259,9 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   const tracingRef = useRef<Tracing | null>(null);
   /* Compass direction/heading */
   const [currentDirection, setCurrentDirection] = useState<number>(0);
+  /* Snackbar states for Sun and Moon tracing; and track if already shown => only show once */
+  const [showMoonInfo, toggleMoonInfo] = useToggleOnce();
+  const [showSunInfo, toggleSunInfo] = useToggleOnce();
 
   /** Memo calculations for:
    *  - landmarkToCoordMemo: Convert LatLng to Coords
@@ -178,14 +269,14 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
    *  - dateTimeMemo: Convert Date and Time to Date
    *  - distanceFactorMemo: Unit factor for sun tracing, the higher the factor the further the sun tracing. Factor is adjusted by sliderVisibility.
    */
-  const landmarkToCoordMemo = useMemo(() => {
+  const centerCoords = useMemo(() => {
     if (center) {
       return convertLatLngToCoords(center);
     }
     return { lat: 0, lng: 0 }; /* return default value if no center provided */
   }, [center]);
 
-  const landmarkElevationMemo = useMemo(() => {
+  const landmarkElevation = useMemo(() => {
     if (!center || !terrenderRef.current || !didInitialDraw) return 0;
     const { lat, lng } = convertLatLngToCoords(center);
     const elevation = terrenderRef.current
@@ -194,7 +285,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     return elevation;
   }, [center, terrenderRef, didInitialDraw]);
 
-  const dateTimeMemo = useMemo(() => {
+  const dateTime = useMemo(() => {
     if (date && time) {
       const currentDate = convertDateTime(date, time);
       return currentDate;
@@ -202,7 +293,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     return new Date(); /* return default value if no time provided */
   }, [date, time]);
 
-  const distanceFactorMemo = useMemo(() => {
+  const distanceFactor = useMemo(() => {
     const distanceFactor = sliderVisibility;
     return distanceFactor;
   }, [sliderVisibility]);
@@ -218,18 +309,17 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
 
     const tenMinAngles = timeOffsets.map((timeDelta) => {
       return getSunAngles(
-        landmarkToCoordMemo,
-        new Date(dateTimeMemo.getTime() + timeDelta * 60000),
-        new Date(dateTimeMemo.getTime() + (timeDelta + 10) * 60000),
+        centerCoords,
+        new Date(dateTime.getTime() + timeDelta * 60000),
+        new Date(dateTime.getTime() + (timeDelta + 10) * 60000),
       );
     });
 
     /* Basepoint = landmark, has to be calculated once */
     const p_0 = [
-      landmarkToCoordMemo.lng,
-      landmarkToCoordMemo.lat,
-      landmarkElevationMemo *
-        terrenderRef.current.getParameters().heightScaling,
+      centerCoords.lng,
+      centerCoords.lat,
+      landmarkElevation * terrenderRef.current.getParameters().heightScaling,
     ];
 
     for (let i = 0; i < tenMinAngles.length - 1; i++) {
@@ -246,15 +336,15 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
 
         /* Point deduced from the vector representing t-timeOffsetInMinutes */
         const p_1 = [
-          p_0[0] - v_1[0] * distanceFactorMemo,
-          p_0[1] - v_1[1] * distanceFactorMemo,
-          p_0[2] - v_1[2] * distanceFactorMemo,
+          p_0[0] - v_1[0] * distanceFactor,
+          p_0[1] - v_1[1] * distanceFactor,
+          p_0[2] - v_1[2] * distanceFactor,
         ];
         /* Point deduced from the vector representing t+timeOffsetInMinutes */
         const p_2 = [
-          p_0[0] - v_2[0] * distanceFactorMemo,
-          p_0[1] - v_2[1] * distanceFactorMemo,
-          p_0[2] - v_2[2] * distanceFactorMemo,
+          p_0[0] - v_2[0] * distanceFactor,
+          p_0[1] - v_2[1] * distanceFactor,
+          p_0[2] - v_2[2] * distanceFactor,
         ];
 
         tracingPoints.push(p_0, p_1, p_2, p_0);
@@ -262,12 +352,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     }
 
     return tracingPoints;
-  }, [
-    dateTimeMemo,
-    distanceFactorMemo,
-    landmarkElevationMemo,
-    landmarkToCoordMemo,
-  ]);
+  }, [dateTime, distanceFactor, landmarkElevation, centerCoords]);
 
   const tracingCoordsMoon = useMemo(() => {
     if (!terrenderRef.current) {
@@ -279,18 +364,17 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
 
     const tenMinAngles = timeOffsets.map((timeDelta) => {
       return getMoonAngles(
-        landmarkToCoordMemo,
-        new Date(dateTimeMemo.getTime() + timeDelta * 60000),
-        new Date(dateTimeMemo.getTime() + (timeDelta + 10) * 60000),
+        centerCoords,
+        new Date(dateTime.getTime() + timeDelta * 60000),
+        new Date(dateTime.getTime() + (timeDelta + 10) * 60000),
       );
     });
 
     /* Basepoint = landmark, has to be calculated once */
     const p_0 = [
-      landmarkToCoordMemo.lng,
-      landmarkToCoordMemo.lat,
-      landmarkElevationMemo *
-        terrenderRef.current.getParameters().heightScaling,
+      centerCoords.lng,
+      centerCoords.lat,
+      landmarkElevation * terrenderRef.current.getParameters().heightScaling,
     ];
 
     for (let i = 0; i < tenMinAngles.length - 1; i++) {
@@ -307,15 +391,15 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
 
         /* Point deduced from the vector representing t-timeOffsetInMinutes */
         const p_1 = [
-          p_0[0] - v_1[0] * distanceFactorMemo,
-          p_0[1] - v_1[1] * distanceFactorMemo,
-          p_0[2] - v_1[2] * distanceFactorMemo,
+          p_0[0] - v_1[0] * distanceFactor,
+          p_0[1] - v_1[1] * distanceFactor,
+          p_0[2] - v_1[2] * distanceFactor,
         ];
         /* Point deduced from the vector representing t+timeOffsetInMinutes */
         const p_2 = [
-          p_0[0] - v_2[0] * distanceFactorMemo,
-          p_0[1] - v_2[1] * distanceFactorMemo,
-          p_0[2] - v_2[2] * distanceFactorMemo,
+          p_0[0] - v_2[0] * distanceFactor,
+          p_0[1] - v_2[1] * distanceFactor,
+          p_0[2] - v_2[2] * distanceFactor,
         ];
 
         tracingPoints.push(p_0, p_1, p_2, p_0);
@@ -323,20 +407,16 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     }
 
     return tracingPoints;
-  }, [
-    dateTimeMemo,
-    distanceFactorMemo,
-    landmarkElevationMemo,
-    landmarkToCoordMemo,
-  ]);
+  }, [dateTime, distanceFactor, landmarkElevation, centerCoords]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const tracingCoordsShadowSun = useMemo(() => {
+  /** 
+  // Activate this function in case you want to trace the coord of the Sun with a prism, instead of triangles on the terrain implemented above in tracingCoordsSun
+  const tracingCoordsSunPrism = useMemo(() => {
     const tenMinAngles = timeOffsets.map((timeDelta) => {
       const [startAzimuth, endAzimuth] = getSunAngles(
-        landmarkToCoordMemo,
-        new Date(dateTimeMemo.getTime() + timeDelta * 60000),
-        new Date(dateTimeMemo.getTime() + (timeDelta + 10) * 60000),
+        centerCoords,
+        new Date(dateTime.getTime() + timeDelta * 60000),
+        new Date(dateTime.getTime() + (timeDelta + 10) * 60000),
       );
       return [startAzimuth, endAzimuth];
     });
@@ -348,15 +428,15 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       }
       const coords = [
         [
-          landmarkToCoordMemo.lng,
-          landmarkToCoordMemo.lat,
-          (landmarkElevationMemo + 1) *
+          centerCoords.lng,
+          centerCoords.lat,
+          (landmarkElevation + 1) *
             terrenderRef.current.getParameters().heightScaling,
         ],
         [
           ...translateCoords(
-            landmarkToCoordMemo.lng,
-            landmarkToCoordMemo.lat,
+            centerCoords.lng,
+            centerCoords.lat,
             500,
             toDeg(sunAzimuths[1]),
           ),
@@ -364,17 +444,17 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
         ], //Sun azimuth at t+timeOffsetInMinutes
         [
           ...translateCoords(
-            landmarkToCoordMemo.lng,
-            landmarkToCoordMemo.lat,
+            centerCoords.lng,
+            centerCoords.lat,
             500,
             toDeg(sunAzimuths[0]),
           ),
           0,
         ], //Sun azimuth at t-timeOffsetInMinutes
         [
-          landmarkToCoordMemo.lng,
-          landmarkToCoordMemo.lat,
-          landmarkElevationMemo *
+          centerCoords.lng,
+          centerCoords.lat,
+          landmarkElevation *
             terrenderRef.current.getParameters().heightScaling,
         ],
       ];
@@ -382,7 +462,8 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     });
 
     return combinedCoords;
-  }, [dateTimeMemo, landmarkToCoordMemo, landmarkElevationMemo]);
+  }, [dateTime, centerCoords, landmarkElevation]);
+  */
 
   /** Helper function setting setShouldRedrawCallback in Terrender
    *  - setShouldRedrawCallback is evaluated in renderLoop of Terrender. If true, it forces a render.
@@ -455,7 +536,7 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
           setDidInitialDraw(true);
         }
       });
-      inputHandlerRef.current = new StandardInputHandler(terrenderRef.current);
+      inputHandlerRef.current = new CustomInputHandler(terrenderRef.current);
       /* Start terrain rendering */
       terrenderRef.current.start();
     } catch (error) {
@@ -501,41 +582,41 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
   useEffect(() => {
     if (celestialBodiesRef.current) {
       celestialBodiesRef.current.updatePath(
-        landmarkToCoordMemo.lat,
-        landmarkToCoordMemo.lng,
+        centerCoords.lat,
+        centerCoords.lng,
         date,
         currentDirection,
-        landmarkElevationMemo,
+        landmarkElevation,
       );
       forceRender();
     }
   }, [
     date,
     forceRender,
-    landmarkToCoordMemo.lat,
-    landmarkToCoordMemo.lng,
+    centerCoords.lat,
+    centerCoords.lng,
     currentDirection,
-    landmarkElevationMemo,
+    landmarkElevation,
   ]);
 
   useEffect(() => {
     if (celestialBodiesRef.current) {
       celestialBodiesRef.current.updatePosition(
-        landmarkToCoordMemo.lat,
-        landmarkToCoordMemo.lng,
-        dateTimeMemo,
+        centerCoords.lat,
+        centerCoords.lng,
+        dateTime,
         currentDirection,
-        landmarkElevationMemo,
+        landmarkElevation,
       );
       forceRender();
     }
   }, [
     forceRender,
-    landmarkToCoordMemo.lat,
-    landmarkToCoordMemo.lng,
-    dateTimeMemo,
+    centerCoords.lat,
+    centerCoords.lng,
+    dateTime,
     currentDirection,
-    landmarkElevationMemo,
+    landmarkElevation,
   ]);
 
   /* Sync tracing Area */
@@ -551,101 +632,115 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
     }
   }, [forceRender, tracingCoordsMoon, tracingCoordsSun]);
 
-  //TODO: bug with compass, moving compass, topDownMode, compass set to 0, disable topDownMode, compass !set to 0 + location incorrect
-  useEffect(() => {
-    if (!didInitialDraw || !terrenderRef.current || !center) return;
+  /* Reset terrain to initial state with the coords given in the input, e.g. when center is changed over SearchField */
+  const resetTerrainToCoords = useCallback(
+    (lat: number, lng: number) => {
+      if (!didInitialDraw || !terrenderRef.current) return;
 
-    if (center) {
-      const { lat, lng } = convertLatLngToCoords(center);
+      /* Compass direction */
+      const defaultDirection = 0;
+      setCurrentDirection(defaultDirection);
+
+      /* Calculate elevation at center */
       const elevation = terrenderRef.current
         .getQuadTree()
         .getHeightValue(lng, lat);
       setElevationCurrentCenter(elevation);
 
-      const z =
-        (elevation + sliderElevation) *
-        terrenderRef.current.getParameters().heightScaling *
-        camHeightMultiplier;
-
-      if (isTopDown) {
+      /* Check if InputHandler is in top down mode and reset the camera position according to this check */
+      if (inputHandlerRef.current?.isTopDownMode()) {
+        /* Positioning of camera slighlty above target location */
         const topDownPosition = [lng, lat, 0.1];
         const topDownTarget = [lng, lat, 0];
         terrenderRef.current
           .getCamera()
-          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]);
+          .changeCamPosition(topDownPosition, topDownTarget);
       } else {
-        const newPos = [lng, lat, z];
-        const newTarget = [
-          lng,
-          ...terrenderRef.current.getCamera().target.slice(1),
-        ];
+        /* Calculate position z-value of camera and add sliderElevation if any */
+        const z_position =
+          (elevation + sliderElevation) *
+          terrenderRef.current.getParameters().heightScaling *
+          camHeightMultiplier;
+        /* Target of camera takes target z-value without any additional elevation */
+        const z_target =
+          elevation *
+          terrenderRef.current.getParameters().heightScaling *
+          camHeightMultiplier;
+
+        /* Set camera and target, where target is calculated according to a compass heading of 0°, a distance of 100, the z-value corresponding to the height of the terrain and the camera's positon */
+        const newPos = [lng, lat, z_position];
+        const newTarget = calculateCamTarget(
+          defaultDirection,
+          100,
+          z_target,
+          newPos,
+        );
         terrenderRef.current.getCamera().changeCamPosition(newPos, newTarget);
       }
-    }
-  }, [
-    center,
-    didInitialDraw,
-    isTopDown,
-    setElevationCurrentCenter,
-    elevationCurrentCenter,
-    sliderElevation,
-  ]);
+    },
+    [didInitialDraw, setElevationCurrentCenter, sliderElevation],
+  );
 
-  /**
-   * Toggles the camera view between top-down mode and the previous mode.
-   * If top-down mode is enabled, it saves the current camera position and target,
-   * then sets the camera to a top-down view. If top-down mode is disabled, it restores
-   * the saved camera position and target.
-   */
-  const toggleTopDownMode = () => {
-    if (terrenderRef.current) {
-      /**
-       * Reset top-down mode by restoring the camera's previous position and target.
-       * This will disable the top-down view and revert to the original camera settings.
-       */
-      if (topDownConfigs) {
-        terrenderRef.current
-          .getCamera()
-          .lookAt(topDownConfigs.position, topDownConfigs.target, [0, 0, 1]);
-        setTopDownConfigs(undefined);
+  /* When Compass updates cardinal direction setDirection is called and rotates camera, no change of position and target of camera instead use of lookAt function */
+  const setDirection = useCallback(
+    (newDirection: number) => {
+      const camera = terrenderRef.current?.getCamera();
+      if (!camera) return;
+
+      setCurrentDirection(newDirection);
+
+      if (toggledTopDown) {
+        /* Calculate rotation around up vector using the new direction */
+        const up = getTopDownUpVec(newDirection);
+        camera.lookAt(camera.position, camera.target, up);
       } else {
-        /* Enable topDown view, Keep track of prev values using setTopDownConfigs */
-        const { position, target } = terrenderRef.current.getCamera();
-        setTopDownConfigs({
-          position,
-          target,
-        });
-
-        const topDownPosition = [position[0], position[1], 0.1];
-        const topDownTarget = [position[0], position[1], 0];
-        terrenderRef.current
-          .getCamera()
-          .lookAt(topDownPosition, topDownTarget, [0, 1, 0]); /* y,x,z */
+        /* Calculate rotation around camera target according to new direction, while preserving distance between camera position and camera target, and z-value. */
+        const newTarget = calculateCamTarget(
+          newDirection,
+          positionTargetDistance(camera.position, camera.target),
+          camera.target[2],
+          camera.position,
+        );
+        camera.changeCamPosition(camera.position, newTarget);
       }
-    }
-  };
+    },
+    [toggledTopDown],
+  );
 
-  const [showMoonInfo, setShowMoonInfo] = useState(false);
-  const hasShownMoonInfo = useRef(false);
-  const [showSunInfo, setShowSunInfo] = useState(false);
-  const hasShownSunInfo = useRef(false);
+  /* Reset terrain when center changes => this makes sure the terrain is always reset to the initial state using the memoized coords */
   useEffect(() => {
-    if (
-      tracingCoordsMoon &&
-      tracingCoordsMoon.length > 0 &&
-      !hasShownMoonInfo.current
-    ) {
-      setShowMoonInfo(true);
-      hasShownMoonInfo.current = true;
-    } else if (
-      tracingCoordsSun &&
-      tracingCoordsSun.length > 0 &&
-      !hasShownSunInfo.current
-    ) {
-      setShowSunInfo(true);
-      hasShownSunInfo.current = true;
+    if (centerCoords.lat && centerCoords.lng)
+      resetTerrainToCoords(centerCoords.lat, centerCoords.lng);
+  }, [centerCoords.lat, centerCoords.lng, resetTerrainToCoords]);
+
+  /* Toggle of Enable/Disable Top Down Camera Button */
+  const toggleTopDown = useCallback(
+    (enable: boolean) => {
+      inputHandlerRef.current?.setTopDownMode(enable);
+      setToggledTopDown(enable);
+      /* Reset to initial state using the memoized coords */
+      resetTerrainToCoords(centerCoords.lat, centerCoords.lng);
+    },
+    [
+      setToggledTopDown,
+      resetTerrainToCoords,
+      centerCoords.lat,
+      centerCoords.lng,
+    ],
+  );
+
+  /* Snackbars with information on tracing areas; set up such that only triggered once */
+  useEffect(() => {
+    if (tracingCoordsSun && tracingCoordsSun.length > 0) {
+      toggleSunInfo();
     }
-  }, [tracingCoordsMoon, tracingCoordsSun]);
+  }, [toggleSunInfo, tracingCoordsSun]);
+
+  useEffect(() => {
+    if (tracingCoordsMoon && tracingCoordsMoon.length > 0) {
+      toggleMoonInfo();
+    }
+  }, [toggleMoonInfo, tracingCoordsMoon]);
 
   return (
     <>
@@ -665,10 +760,10 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
           <Button
             color="secondary"
             variant="contained"
-            onClick={toggleTopDownMode}
+            onClick={() => toggleTopDown(!toggledTopDown)}
             size="small"
           >
-            {topDownConfigs
+            {toggledTopDown
               ? "Disable Top Down Camera"
               : "Enable Top Down Camera"}
           </Button>
@@ -676,20 +771,18 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
       </div>
 
       <Compass
-        camera={terrenderRef.current?.getCamera()}
-        setCurrentDirection={setCurrentDirection}
-        currentDirection={currentDirection}
-        topDown={toggledTopDown}
+        setDirection={setDirection}
+        direction={currentDirection}
       ></Compass>
 
       <Portal>
         <Snackbar
           open={showMoonInfo}
-          onClose={() => setShowMoonInfo(false)}
+          onClose={toggleMoonInfo}
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
           <Alert
-            onClose={() => setShowMoonInfo(false)}
+            onClose={toggleMoonInfo}
             severity="info"
             variant="filled"
             sx={{ width: "100%" }}
@@ -704,11 +797,11 @@ const TerrenderCanvas: React.FC<TerrenderCanvasProps> = ({
 
         <Snackbar
           open={showSunInfo}
-          onClose={() => setShowSunInfo(false)}
+          onClose={toggleSunInfo}
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
           <Alert
-            onClose={() => setShowSunInfo(false)}
+            onClose={toggleSunInfo}
             severity="info"
             variant="filled"
             sx={{ width: "100%" }}

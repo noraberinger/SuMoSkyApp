@@ -1,104 +1,53 @@
-import React, { useCallback, useEffect, useState } from "react";
-import Camera from "terrender-core/src/Utils/Camera";
-import { normalizeDegrees } from "./Utils/Calc";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 interface CompassProps {
-  camera: Camera | undefined;
-  currentDirection: number;
-  setCurrentDirection: React.Dispatch<React.SetStateAction<number>>;
-  topDown: boolean;
+  direction: number;
+  setDirection: (newDirection: number) => void;
 }
 
-const Compass: React.FC<CompassProps> = ({
-  camera,
-  setCurrentDirection,
-  currentDirection,
-  topDown,
-}) => {
+/*  Calculating angle of Compass */
+const getAngleFromCenter = (
+  element: HTMLElement,
+  event: MouseEvent | TouchEvent,
+) => {
+  const rectangle = element.getBoundingClientRect();
+  const centerX = rectangle.left + rectangle.width / 2;
+  const centerY = rectangle.top + rectangle.height / 2;
+
+  let clientX, clientY;
+  if ("touches" in event) {
+    clientX = event.touches[0].clientX;
+    clientY = event.touches[0].clientY;
+  } else {
+    clientX = event.clientX;
+    clientY = event.clientY;
+  }
+
+  return (Math.atan2(clientY - centerY, clientX - centerX) * 180) / Math.PI;
+};
+
+const Compass: React.FC<CompassProps> = ({ setDirection, direction }) => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [startAngle, setStartAngle] = useState<number>(0);
   const [startMouseAngle, setStartMouseAngle] = useState<number>(0);
 
-  const updateCompass = (direction: number) => {
-    const arrow = document.getElementById("compass-arrow");
-    const label = document.getElementById("compass-label");
-    if (arrow && label) {
-      arrow.style.transform = `translate(-50%, -50%) rotate(${direction}deg)`;
-      label.textContent = `${Math.round(direction)}°`;
-    } else {
-      console.warn("compass-arrow or compass-label is null.");
-    }
-  };
+  const compassRef = useRef<HTMLDivElement | null>(null);
 
-  const getAngleFromCenter = (
-    element: HTMLElement,
-    event: MouseEvent | TouchEvent,
-  ) => {
-    const rectangle = element.getBoundingClientRect();
-    const centerX = rectangle.left + rectangle.width / 2;
-    const centerY = rectangle.top + rectangle.height / 2;
-
-    let clientX, clientY;
-    if ("touches" in event) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    } else {
-      clientX = event.clientX;
-      clientY = event.clientY;
-    }
-
-    return (Math.atan2(clientY - centerY, clientX - centerX) * 180) / Math.PI;
-  };
-
-  const calculateCamTarget = useCallback(
-    (direction: number, position: number[], target: number[]) => {
-      //distance between camera and target
-      const radius = Math.sqrt(
-        (position[0] - target[0]) ** 2 + (position[1] - target[1]) ** 2,
-      );
-      console.log("radius !topDown", radius);
-
-      // Compass direction in radians
-      const angleInRadians = (direction * Math.PI) / 180;
-
-      // Target position reflecting 360° movement of camera
-      const newTargetX = position[1] + radius * Math.sin(angleInRadians);
-      const newTargetY = position[0] + radius * Math.cos(angleInRadians);
-      // Maintain the same elevation for the target
-      const newTargetZ = position[2];
-
-      return [newTargetX, newTargetY, newTargetZ];
-    },
-    [],
-  );
-
-  //TODO fix rotation, radius def wrong + rotation, currently north is south and vice versa after 1 full rotation
-  const calculateTopDownCamTarget = useCallback((direction: number) => {
-    const angleInRadians = (normalizeDegrees(direction) * Math.PI) / 180;
-
-    // TODO fix this
-    if (direction >= 90 && direction < 270) {
-      return [Math.sin(angleInRadians), 1, Math.abs(Math.cos(angleInRadians))];
-    } else {
-      return [Math.abs(Math.sin(angleInRadians)), 1, Math.cos(angleInRadians)];
-    }
-  }, []);
-
+  /* Using click and drag on top of the Compass surface one can move the compass */
   const startDrag = useCallback(
     (event: MouseEvent | TouchEvent) => {
       event.preventDefault();
       event.stopPropagation();
 
       setIsDragging(true);
-      setStartAngle(currentDirection);
-      const compassElement = document.getElementById("compass");
-      if (compassElement) {
-        setStartMouseAngle(getAngleFromCenter(compassElement, event));
+      setStartAngle(direction);
+      if (compassRef.current) {
+        setStartMouseAngle(getAngleFromCenter(compassRef.current, event));
       } else {
         console.warn("Compass is null.");
       }
     },
-    [currentDirection],
+    [direction],
   );
 
   const drag = useCallback(
@@ -107,65 +56,39 @@ const Compass: React.FC<CompassProps> = ({
       event.preventDefault();
       event.stopPropagation();
 
-      const compassElement = document.getElementById("compass");
-      if (compassElement) {
-        const currentMouseAngle = getAngleFromCenter(compassElement, event);
+      if (compassRef.current) {
+        const currentMouseAngle = getAngleFromCenter(compassRef.current, event);
         const angleDelta = currentMouseAngle - startMouseAngle;
         const newDirection = (startAngle + angleDelta + 360) % 360;
 
-        if (camera && !topDown) {
-          setCurrentDirection(newDirection);
-          updateCompass(newDirection);
-          const newTarget = calculateCamTarget(
-            newDirection,
-            camera.position,
-            camera.target,
-          );
-          camera.changeCamPosition(camera.position, newTarget);
-        } else if (camera && topDown) {
-          updateCompass(newDirection);
-          const up = calculateTopDownCamTarget(newDirection);
-          camera.lookAt(camera.position, camera.target, up);
-        }
+        setDirection(newDirection);
       }
     },
-    [
-      calculateCamTarget,
-      calculateTopDownCamTarget,
-      camera,
-      isDragging,
-      setCurrentDirection,
-      startAngle,
-      startMouseAngle,
-      topDown,
-    ],
+    [isDragging, setDirection, startAngle, startMouseAngle],
   );
 
   const endDrag = useCallback(() => {
     setIsDragging(false);
   }, []);
 
+  /* Inhibit MouseEvent and TouchEvent when not on Compass in order to inhibit interference with the StandardInputHandler of TerrenderCanvas */
   const stopDragOutsideCompass = useCallback(
     (event: MouseEvent | TouchEvent) => {
-      const compassElement = document.getElementById("compass");
-      if (compassElement && !compassElement.contains(event.target as Node)) {
+      if (compassRef.current?.contains(event.target as Node)) {
         endDrag();
       }
     },
     [endDrag],
   );
 
+  /* Event Listeners for Compass */
   useEffect(() => {
-    updateCompass(currentDirection);
-  }, [currentDirection]);
-
-  useEffect(() => {
-    const compassElement = document.getElementById("compass");
-    if (compassElement) {
-      compassElement.addEventListener("mousedown", startDrag);
-      compassElement.addEventListener("touchstart", startDrag);
-      compassElement.addEventListener("mouseleave", stopDragOutsideCompass);
-      compassElement.addEventListener("touchcancel", stopDragOutsideCompass);
+    const compassEl = compassRef.current;
+    if (compassEl) {
+      compassEl.addEventListener("mousedown", startDrag);
+      compassEl.addEventListener("touchstart", startDrag);
+      compassEl.addEventListener("mouseleave", stopDragOutsideCompass);
+      compassEl.addEventListener("touchcancel", stopDragOutsideCompass);
     }
     document.addEventListener("mousemove", drag);
     document.addEventListener("touchmove", drag);
@@ -173,17 +96,11 @@ const Compass: React.FC<CompassProps> = ({
     document.addEventListener("touchend", endDrag);
 
     return () => {
-      if (compassElement) {
-        compassElement.removeEventListener("mousedown", startDrag);
-        compassElement.removeEventListener("touchstart", startDrag);
-        compassElement.removeEventListener(
-          "mouseleave",
-          stopDragOutsideCompass,
-        );
-        compassElement.removeEventListener(
-          "touchcancel",
-          stopDragOutsideCompass,
-        );
+      if (compassEl) {
+        compassEl.removeEventListener("mousedown", startDrag);
+        compassEl.removeEventListener("touchstart", startDrag);
+        compassEl.removeEventListener("mouseleave", stopDragOutsideCompass);
+        compassEl.removeEventListener("touchcancel", stopDragOutsideCompass);
       }
       document.removeEventListener("mousemove", drag);
       document.removeEventListener("touchmove", drag);
@@ -193,9 +110,12 @@ const Compass: React.FC<CompassProps> = ({
   }, [startDrag, drag, endDrag, stopDragOutsideCompass]);
 
   return (
-    <div id="compass">
-      <div id="compass-arrow"></div>
-      <div id="compass-label">0°</div>
+    <div ref={compassRef} id="compass">
+      <div
+        id="compass-arrow"
+        style={{ transform: `translate(-50%, -50%) rotate(${direction}deg)` }}
+      ></div>
+      <div id="compass-label">{`${Math.round(direction)}°`}</div>
       <div className="compass-marker" style={{ top: "10px", left: "50%" }}>
         N
       </div>
