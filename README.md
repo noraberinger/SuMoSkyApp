@@ -19,7 +19,7 @@ The goal of this Bachelor Thesis is to develop a **web application** that enable
 
 ## General Setup
 - Clone this repository. The main branch contains the latest features as of the 15th of January 2025.
-- The repository makes use of [WebGisTerrain](https://gitlab.ifi.uzh.ch/vmml/webgisterrain) [V2.0 branch](https://gitlab.ifi.uzh.ch/vmml/webgisterrain/-/tree/V2.0?ref_type=heads). The mentioned repository is linked using git sumbodule.
+- The repository makes use of [WebGisTerrain](https://gitlab.ifi.uzh.ch/vmml/webgisterrain) [V2.0 branch](https://gitlab.ifi.uzh.ch/vmml/webgisterrain/-/tree/V2.0?ref_type=heads). The mentioned repository is linked using git sumbodule. The github repository can be found here: [Terrender](https://github.com/crocij/terrender).
     - Run `git submodule init` after cloning this repo to your local machine.
     - In order to update the sumbodules execute `git submodule update --remote`.
 
@@ -45,7 +45,7 @@ to **`(this.projectionMatrix = m4.perspective(this.#fov, this.gl.canvas.width / 
 The change targets the near and far plane of the projectionMatrix. Please take note of this change and adjust it manually, as any local changes to the submodule are saved locally only and hence are overwritten once `git submodule update --remote` is executed.
 
 ## Required Data
-The [configuration file](https://gitlab.ifi.uzh.ch/vmml/sumoskyapp/-/blob/main/packages/server/server-config.json?ref_type=heads) of the production server is by default set up to use the provided test data. Any geographical data used in this project was provided by the Visualization and MultiMedia Lab of the University of Zurich.
+The [configuration file](https://github.com/noraberinger/SuMoSkyApp/blob/mapFeatures-branch/packages/server/server-config.json) of the production server is by default set up to use test data provided by the Visualization and MultiMedia Lab of the University of Zurich. Any geographical data used in this project was provided by the Visualization and MultiMedia Lab of the University of Zurich. For any access to the data please contact them directly.
 
 
 ## License
