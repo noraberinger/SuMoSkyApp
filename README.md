@@ -5,7 +5,7 @@ The goal of this Bachelor Thesis is to develop a **web application** that enable
 
 ### Key Features
 - **3D Terrain:** 
-    - Usage of [Terrender source code](https://gitlab.ifi.uzh.ch/vmml/webgisterrain/-/tree/master/terrender-core/src?ref_type=heads) for a smooth and high-quality terrain rendering.
+    - Usage of [Terrender source code](https://gitlab.ifi.uzh.ch/vmml/webgisterrain/-/tree/master/terrender-core/src?ref_type=heads) for a smooth and high-quality terrain rendering. The github repository can be found here: [Terrender](https://github.com/crocij/terrender).
 - **2D Map:** 
     - Offers an efficient, clear and practical way of pinpointing a selected landmark.
     - Managing setting, editing, and removal of markers for selected points of interest. 
@@ -19,7 +19,7 @@ The goal of this Bachelor Thesis is to develop a **web application** that enable
 
 ## General Setup
 - Clone this repository. The main branch contains the latest features as of the 15th of January 2025.
-- The repository makes use of [WebGisTerrain](https://gitlab.ifi.uzh.ch/vmml/webgisterrain) [V2.0 branch](https://gitlab.ifi.uzh.ch/vmml/webgisterrain/-/tree/V2.0?ref_type=heads). The mentioned repository is linked using git sumbodule. The github repository can be found here: [Terrender](https://github.com/crocij/terrender).
+- The repository makes use of [WebGisTerrain](https://gitlab.ifi.uzh.ch/vmml/webgisterrain) [V2.0 branch](https://gitlab.ifi.uzh.ch/vmml/webgisterrain/-/tree/V2.0?ref_type=heads). The mentioned repository is linked using git sumbodule.
     - Run `git submodule init` after cloning this repo to your local machine.
     - In order to update the sumbodules execute `git submodule update --remote`.
 
